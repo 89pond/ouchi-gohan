@@ -327,16 +327,23 @@ const Store = {
 };
 
 
-// ================= 2. ApiClient (Gemini 2.5 BYOK & モック ハイブリッド) =================
+// ================= 2. ApiClient (Gemini 3.8/3.1 BYOK & モック ハイブリッド) =================
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-1.5-flash-latest'];
-let cachedActiveModel = 'gemini-2.5-flash';
+// 最も賢くトークン使用効率の高い最新モデルを最優先
+const GEMINI_MODELS = ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash'];
+let cachedActiveModel = 'gemini-3.8-flash';
+
+// トークン消費量を抑える省エネ生成設定 (出力を引き締めて無駄な消費をカット)
+const EFFICIENT_GEN_CONFIG = {
+  maxOutputTokens: 1500,
+  temperature: 0.3
+};
 
 const ApiClient = {
   // 利用可能なモデルを取得
   async getActiveModel(key) {
     if (cachedActiveModel) return cachedActiveModel;
-    return 'gemini-2.5-flash';
+    return 'gemini-3.8-flash';
   },
 
   // API接続テスト
@@ -353,13 +360,14 @@ const ApiClient = {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: 'Hello! Respond with OK' }] }]
+            contents: [{ parts: [{ text: 'Respond: OK' }] }],
+            generationConfig: { maxOutputTokens: 10 }
           })
         });
 
         if (res.ok) {
           cachedActiveModel = model;
-          return { success: true, message: `Gemini API (${model}) との接続に成功しました！🎉 本物のAI機能が利用可能です。` };
+          return { success: true, message: `最新モデル「${model}」と接続成功！🎉\n（省トークン・高知能モードで稼働中）` };
         } else {
           const err = await res.json().catch(() => ({}));
           lastError = `(${res.status} ${model}): ${err.error?.message || res.statusText}`;
@@ -399,7 +407,8 @@ const ApiClient = {
               { text: prompt },
               { inline_data: { mime_type: mimeType, data: base64Image.split(',')[1] || base64Image } }
             ]
-          }]
+          }],
+          generationConfig: EFFICIENT_GEN_CONFIG
         })
       });
       if (!res.ok) throw new Error(`API Error: ${res.status}`);
@@ -493,10 +502,13 @@ ${(settings.children || []).map(c => `- ${c.name}: ${c.birthDate}生 (${stageDes
 }`;
 
     try {
-      const res = await fetch(`${GEMINI_API_BASE}/${cachedActiveModel || 'gemini-2.5-flash'}:generateContent?key=${key}`, {
+      const res = await fetch(`${GEMINI_API_BASE}/${cachedActiveModel || 'gemini-3.8-flash'}:generateContent?key=${key}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: EFFICIENT_GEN_CONFIG
+        })
       });
       if (!res.ok) throw new Error(`API Error: ${res.status}`);
       const data = await res.json();
@@ -525,7 +537,7 @@ ${(settings.children || []).map(c => `- ${c.name}: ${c.birthDate}生 (${stageDes
 }`;
 
     try {
-      const res = await fetch(`${GEMINI_API_BASE}/${cachedActiveModel || 'gemini-2.5-flash'}:generateContent?key=${key}`, {
+      const res = await fetch(`${GEMINI_API_BASE}/${cachedActiveModel || 'gemini-3.8-flash'}:generateContent?key=${key}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -534,7 +546,8 @@ ${(settings.children || []).map(c => `- ${c.name}: ${c.birthDate}生 (${stageDes
               { text: prompt },
               { inline_data: { mime_type: mimeType, data: base64Image.split(',')[1] || base64Image } }
             ]
-          }]
+          }],
+          generationConfig: { maxOutputTokens: 600, temperature: 0.2 }
         })
       });
       if (!res.ok) throw new Error(`API Error: ${res.status}`);
