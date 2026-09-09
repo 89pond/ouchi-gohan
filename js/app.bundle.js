@@ -327,18 +327,209 @@ const Store = {
 };
 
 
-// ================= 2. ApiClient =================
+// ================= 2. ApiClient (Gemini BYOK & モック ハイブリッド) =================
+const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
+const GEMINI_MODEL = 'gemini-1.5-flash';
+
 const ApiClient = {
+  // API接続テスト
+  async testConnection(apiKey) {
+    const key = apiKey || Store.getApiKey();
+    if (!key) {
+      return { success: false, message: 'APIキーが入力されていません。' };
+    }
+    try {
+      const res = await fetch(`${GEMINI_API_BASE}/${GEMINI_MODEL}:generateContent?key=${key}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: 'Hello! Please respond with "OK"' }] }]
+        })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        return { success: false, message: `接続失敗 (${res.status}): ${err.error?.message || res.statusText}` };
+      }
+      return { success: true, message: 'Gemini APIとの接続に成功しました！🎉' };
+    } catch (e) {
+      return { success: false, message: `通信エラー: ${e.message}` };
+    }
+  },
+
   async extractGroceriesFromReceipt(base64Image, mimeType = 'image/jpeg') {
-    return this.mockReceiptExtraction();
+    const key = Store.getApiKey();
+    if (!key) return this.mockReceiptExtraction();
+
+    const prompt = `あなたは食料品の買い出しレシートから食材在庫を自動抽出・正規化するプロのエージェントです。
+画像内のレシートから「食品・食材」のみを抽出してください。
+【必須ルール】
+- 調味料、日用品（洗剤、ティッシュ等）、レジ袋、割引券等の非食品は完全に除外すること。
+- 商品の略称（例：「国産豚ﾊﾞﾗうす切」「有機ｷｬﾍﾞﾂ1/2」等）は、一般的な名詞（例：「豚バラ肉」「キャベツ」）へ正規化すること。
+- 各食材の一般的な消費期限の目安日数（1〜14日程度）と数量、カテゴリ（肉類/魚介/野菜/卵・大豆/乳製品/その他）を推計すること。
+
+以下の純粋なJSON配列形式のみで出力してください（Markdown装飾なし）:
+[
+  {"name": "豚バラ肉", "category": "肉類", "quantity": "1パック", "expiryDays": 2},
+  {"name": "キャベツ", "category": "野菜", "quantity": "1/2個", "expiryDays": 5}
+]`;
+
+    try {
+      const res = await fetch(`${GEMINI_API_BASE}/${GEMINI_MODEL}:generateContent?key=${key}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: prompt },
+              { inline_data: { mime_type: mimeType, data: base64Image.split(',')[1] || base64Image } }
+            ]
+          }]
+        })
+      });
+      if (!res.ok) throw new Error(`API Error: ${res.status}`);
+      const data = await res.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+      const cleanJson = text.replace(/```json\n?|\n?```/g, '').trim();
+      return JSON.parse(cleanJson);
+    } catch (err) {
+      console.warn('Real Gemini API failed, fallback to mock:', err);
+      return this.mockReceiptExtraction();
+    }
   },
 
   async generateMealProposal(inventory, settings, genre = 'auto', stepMode = 'combined', servings = 3) {
-    return this.mockMealProposal(inventory, settings, genre, stepMode, servings);
+    const key = Store.getApiKey();
+    if (!key) return this.mockMealProposal(inventory, settings, genre, stepMode, servings);
+
+    const stageDescriptions = {
+      milk: '授乳期 (離乳前)',
+      early: '離乳食初期 (5〜6ヶ月: トロトロのペースト・すりつぶし)',
+      mid: '離乳食中期 (7〜8ヶ月: 舌でつぶせる豆腐くらいの固さ・細かく刻む)',
+      late: '離乳食後期 (9〜11ヶ月: 歯ぐきでつぶせるバナナの固さ・手づかみ食べ)',
+      complete: '離乳食完了期 (12〜18ヶ月: 肉団子の固さ・薄味)',
+      toddler: '幼児食 (1歳半〜5歳: 大人より薄味、喉詰まり防止)'
+    };
+
+    const adultGoalDescriptions = {
+      general: '一般・バランス重視（野菜と主菜の調和）',
+      athlete: 'アスリート（高タンパク質重視、筋力維持・増量）',
+      diet: 'ダイエット（低糖質・低脂質、食物繊維豊富）',
+      health: '健康管理（減塩・血糖値上昇を抑えるベジファースト）'
+    };
+
+    const prompt = `あなたは「一度の調理で家族全員分を作る」時短と安全を極めたプロの管理栄養士・AIシェフです。
+手持ちの食材在庫をベースに、大人の健康目的と子どもの月齢に合わせた「取り分け献立セット（主食・主菜・副菜・汁物）」を1セット提案してください。
+作成人数目安: 約${servings}人前
+
+【現在の冷蔵庫の食材】
+${inventory.map(i => `- ${i.name} (${i.quantity}, 賞味期限目安あと${i.expiryDays}日)`).join('\n')}
+
+【大人の健康目的】
+${(settings.adultGoals || ['general']).map(g => adultGoalDescriptions[g] || g).join(', ')}
+
+【家族の子ども構成】
+${(settings.children || []).map(c => `- ${c.name}: ${c.birthDate}生 (${stageDescriptions[c.stage] || '幼児食'}), NG/アレルギー: ${c.ngFoods || 'なし'}`).join('\n')}
+
+【絶対安全ガードレール】
+- 1歳未満がいる場合、ハチミツ・黒糖は絶対禁止。
+- 幼児食・離乳食の食材はミニトマトやナッツ等の誤飲防止カットを手順に明記。
+- 味付け（塩分・香辛料）を行う前に子ども分を取り分ける手順を必須記載。
+
+以下の純粋なJSONフォーマットのみを出力してください（Markdown装飾なし）:
+{
+  "title": "献立セットのタイトル（例: 豚バラとキャベツの重ね蒸し定食）",
+  "genre": "和風",
+  "servings": ${servings},
+  "courses": {
+    "staple": {"type": "主食", "name": "ごはん", "note": "普通盛り"},
+    "main": {"type": "主菜", "name": "豚バラとキャベツの重ね蒸し", "note": "素材の旨味"},
+    "side": {"type": "副菜", "name": "にんじんと玉ねぎの和え物", "note": "さっぱり"},
+    "soup": {"type": "汁物", "name": "豆腐とわかめのお味噌汁", "note": "出汁の香り"}
+  },
+  "ingredientsWithAmounts": [
+    {"name": "豚バラ肉", "amount": "200g"},
+    {"name": "キャベツ", "amount": "1/4個"}
+  ],
+  "seasonings": [
+    {"name": "和風出汁", "amount": "小さじ1"},
+    {"name": "ポン酢", "amount": "大さじ2"}
+  ],
+  "baseSteps": [
+    "【共通・下ごしらえ】野菜とお肉を食べやすく切る。",
+    "【主菜・汁物 同時調理】フライパンで蒸し焼きにし、小鍋でお味噌汁を作る。",
+    "👶【子ども用取り分け】調味料を入れる前に柔らかい具材を取り分け、刻む。",
+    "【主菜・汁物 仕上げ】大人用の味付けをして完成。"
+  ],
+  "courseSteps": {
+    "main": ["【主菜】肉とキャベツを蒸す。", "👶【取り分け】味付け前に取り分ける。", "【主菜】大人用に味付けする。"],
+    "side": ["【副菜】和える。"],
+    "soup": ["【汁物】煮立てる。", "👶【取り分け】薄めて子ども用に。", "【汁物】味噌を溶く。"],
+    "staple": ["【主食】ごはんをよそう。"]
+  },
+  "stepMode": "${stepMode}",
+  "childSeparations": [
+    {"childName": "子ども", "stage": "幼児食", "instruction": "味付け前に取り分け、ハサミで一口大にカットする。"}
+  ],
+  "adultArrangements": [
+    {"goalName": "一般", "tip": "野菜から先に食べるベジファーストを推奨。"}
+  ],
+  "safetyAlert": "1歳未満へのハチミツ厳禁。味付け前の取り分けを徹底してください。"
+}`;
+
+    try {
+      const res = await fetch(`${GEMINI_API_BASE}/${GEMINI_MODEL}:generateContent?key=${key}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      });
+      if (!res.ok) throw new Error(`API Error: ${res.status}`);
+      const data = await res.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+      const cleanJson = text.replace(/```json\n?|\n?```/g, '').trim();
+      return JSON.parse(cleanJson);
+    } catch (err) {
+      console.warn('Real Gemini API meal proposal failed, fallback to mock:', err);
+      return this.mockMealProposal(inventory, settings, genre, stepMode, servings);
+    }
   },
 
   async analyzeMealImage(base64Image, mimeType = 'image/jpeg') {
-    return this.mockMealAnalysis();
+    const key = Store.getApiKey();
+    if (!key) return this.mockMealAnalysis();
+
+    const prompt = `この食事写真から料理名を特定し、1人前あたりの推定カロリーとPFC（タンパク質・脂質・炭水化物）、栄養バランスのアドバイスを算出してください。
+以下の純粋なJSONフォーマットのみを出力してください（Markdown装飾なし）:
+{
+  "dishName": "推定された料理名",
+  "calories": 580,
+  "protein": 24,
+  "fat": 18,
+  "carbs": 75,
+  "feedback": "タンパク質と野菜がバランス良く摂れています。夜食の場合は主食（炭水化物）を少し控えめにするとさらに理想的です。"
+}`;
+
+    try {
+      const res = await fetch(`${GEMINI_API_BASE}/${GEMINI_MODEL}:generateContent?key=${key}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: prompt },
+              { inline_data: { mime_type: mimeType, data: base64Image.split(',')[1] || base64Image } }
+            ]
+          }]
+        })
+      });
+      if (!res.ok) throw new Error(`API Error: ${res.status}`);
+      const data = await res.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+      const cleanJson = text.replace(/```json\n?|\n?```/g, '').trim();
+      return JSON.parse(cleanJson);
+    } catch (err) {
+      console.warn('Real Gemini API meal analysis failed, fallback to mock:', err);
+      return this.mockMealAnalysis();
+    }
   },
 
   mockReceiptExtraction() {
@@ -1367,6 +1558,11 @@ const App = {
       chk.checked = (settings.adultGoals || ['general']).includes(chk.value);
     });
 
+    const apiKeyInput = document.getElementById('setting-api-key');
+    if (apiKeyInput) {
+      apiKeyInput.value = Store.getApiKey();
+    }
+
     this.renderChildrenList(settings.children || []);
     this.updateHouseholdServingsBanner(settings);
   },
@@ -1587,6 +1783,34 @@ const App = {
       this.applySettings(updated);
       alert(`家族設定を保存しました！\n（基本の作成人数は ${autoServings}人分 に更新されました）`);
     });
+
+    // APIキー保存
+    const saveKeyBtn = document.getElementById('save-api-key-btn');
+    if (saveKeyBtn) {
+      saveKeyBtn.onclick = () => {
+        const key = document.getElementById('setting-api-key')?.value || '';
+        Store.saveApiKey(key);
+        alert('Gemini APIキーを端末に安全に保存しました！');
+      };
+    }
+
+    // API接続テスト
+    const testKeyBtn = document.getElementById('test-api-key-btn');
+    if (testKeyBtn) {
+      testKeyBtn.onclick = async () => {
+        const key = document.getElementById('setting-api-key')?.value || '';
+        const originalText = testKeyBtn.textContent;
+        testKeyBtn.disabled = true;
+        testKeyBtn.textContent = '接続中...';
+        try {
+          const res = await ApiClient.testConnection(key);
+          alert(res.message);
+        } finally {
+          testKeyBtn.disabled = false;
+          testKeyBtn.textContent = originalText;
+        }
+      };
+    }
 
     document.getElementById('export-backup-btn')?.addEventListener('click', () => Store.exportBackup());
     document.getElementById('import-backup-input')?.addEventListener('change', (e) => {
