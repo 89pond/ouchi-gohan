@@ -327,33 +327,49 @@ const Store = {
 };
 
 
-// ================= 2. ApiClient (Gemini BYOK & モック ハイブリッド) =================
+// ================= 2. ApiClient (Gemini 2.5 BYOK & モック ハイブリッド) =================
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-const GEMINI_MODEL = 'gemini-1.5-flash';
+const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-1.5-flash-latest'];
+let cachedActiveModel = 'gemini-2.5-flash';
 
 const ApiClient = {
+  // 利用可能なモデルを取得
+  async getActiveModel(key) {
+    if (cachedActiveModel) return cachedActiveModel;
+    return 'gemini-2.5-flash';
+  },
+
   // API接続テスト
   async testConnection(apiKey) {
     const key = apiKey || Store.getApiKey();
     if (!key) {
       return { success: false, message: 'APIキーが入力されていません。' };
     }
-    try {
-      const res = await fetch(`${GEMINI_API_BASE}/${GEMINI_MODEL}:generateContent?key=${key}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: 'Hello! Please respond with "OK"' }] }]
-        })
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        return { success: false, message: `接続失敗 (${res.status}): ${err.error?.message || res.statusText}` };
+
+    let lastError = null;
+    for (const model of GEMINI_MODELS) {
+      try {
+        const res = await fetch(`${GEMINI_API_BASE}/${model}:generateContent?key=${key}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: 'Hello! Respond with OK' }] }]
+          })
+        });
+
+        if (res.ok) {
+          cachedActiveModel = model;
+          return { success: true, message: `Gemini API (${model}) との接続に成功しました！🎉 本物のAI機能が利用可能です。` };
+        } else {
+          const err = await res.json().catch(() => ({}));
+          lastError = `(${res.status} ${model}): ${err.error?.message || res.statusText}`;
+        }
+      } catch (e) {
+        lastError = `通信エラー (${model}): ${e.message}`;
       }
-      return { success: true, message: 'Gemini APIとの接続に成功しました！🎉' };
-    } catch (e) {
-      return { success: false, message: `通信エラー: ${e.message}` };
     }
+
+    return { success: false, message: `接続失敗: ${lastError}` };
   },
 
   async extractGroceriesFromReceipt(base64Image, mimeType = 'image/jpeg') {
@@ -374,7 +390,7 @@ const ApiClient = {
 ]`;
 
     try {
-      const res = await fetch(`${GEMINI_API_BASE}/${GEMINI_MODEL}:generateContent?key=${key}`, {
+      const res = await fetch(`${GEMINI_API_BASE}/${cachedActiveModel || 'gemini-2.5-flash'}:generateContent?key=${key}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -477,7 +493,7 @@ ${(settings.children || []).map(c => `- ${c.name}: ${c.birthDate}生 (${stageDes
 }`;
 
     try {
-      const res = await fetch(`${GEMINI_API_BASE}/${GEMINI_MODEL}:generateContent?key=${key}`, {
+      const res = await fetch(`${GEMINI_API_BASE}/${cachedActiveModel || 'gemini-2.5-flash'}:generateContent?key=${key}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
@@ -509,7 +525,7 @@ ${(settings.children || []).map(c => `- ${c.name}: ${c.birthDate}生 (${stageDes
 }`;
 
     try {
-      const res = await fetch(`${GEMINI_API_BASE}/${GEMINI_MODEL}:generateContent?key=${key}`, {
+      const res = await fetch(`${GEMINI_API_BASE}/${cachedActiveModel || 'gemini-2.5-flash'}:generateContent?key=${key}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
