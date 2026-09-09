@@ -327,11 +327,11 @@ const Store = {
 };
 
 
-// ================= 2. ApiClient (Gemini 3.8/3.1 BYOK & モック ハイブリッド) =================
+// ================= 2. ApiClient (Gemini 3.5 Flash-Lite BYOK & モック ハイブリッド) =================
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-// 最も賢くトークン使用効率の高い最新モデルを最優先
-const GEMINI_MODELS = ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash'];
-let cachedActiveModel = 'gemini-3.8-flash';
+// 初期値: トークン使用量が最も少なくコスト効率最強の Gemini 3.5 Flash-Lite
+const GEMINI_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-2.5-flash'];
+let cachedActiveModel = 'gemini-3.5-flash-lite';
 
 // トークン消費量を抑える省エネ生成設定 (出力を引き締めて無駄な消費をカット)
 const EFFICIENT_GEN_CONFIG = {
@@ -343,7 +343,7 @@ const ApiClient = {
   // 利用可能なモデルを取得
   async getActiveModel(key) {
     if (cachedActiveModel) return cachedActiveModel;
-    return 'gemini-3.8-flash';
+    return 'gemini-3.5-flash-lite';
   },
 
   // API接続テスト
@@ -398,7 +398,7 @@ const ApiClient = {
 ]`;
 
     try {
-      const res = await fetch(`${GEMINI_API_BASE}/${cachedActiveModel || 'gemini-2.5-flash'}:generateContent?key=${key}`, {
+      const res = await fetch(`${GEMINI_API_BASE}/${cachedActiveModel || 'gemini-3.5-flash-lite'}:generateContent?key=${key}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -502,7 +502,7 @@ ${(settings.children || []).map(c => `- ${c.name}: ${c.birthDate}生 (${stageDes
 }`;
 
     try {
-      const res = await fetch(`${GEMINI_API_BASE}/${cachedActiveModel || 'gemini-3.8-flash'}:generateContent?key=${key}`, {
+      const res = await fetch(`${GEMINI_API_BASE}/${cachedActiveModel || 'gemini-3.5-flash-lite'}:generateContent?key=${key}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -537,7 +537,7 @@ ${(settings.children || []).map(c => `- ${c.name}: ${c.birthDate}生 (${stageDes
 }`;
 
     try {
-      const res = await fetch(`${GEMINI_API_BASE}/${cachedActiveModel || 'gemini-3.8-flash'}:generateContent?key=${key}`, {
+      const res = await fetch(`${GEMINI_API_BASE}/${cachedActiveModel || 'gemini-3.5-flash-lite'}:generateContent?key=${key}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
