@@ -1780,31 +1780,62 @@ const App = {
         adultGoals: selectedGoals.length ? selectedGoals : ['general']
       };
       Store.saveSettings(updated);
+      const inputApiKey = document.getElementById('setting-api-key')?.value?.trim();
+      if (inputApiKey !== undefined) Store.saveApiKey(inputApiKey);
       this.applySettings(updated);
       alert(`家族設定を保存しました！\n（基本の作成人数は ${autoServings}人分 に更新されました）`);
     });
 
     // APIキー保存
     const saveKeyBtn = document.getElementById('save-api-key-btn');
+    const statusMsg = document.getElementById('api-key-status-msg');
+
+    const showApiKeyStatus = (text, isSuccess) => {
+      if (!statusMsg) return;
+      statusMsg.className = `text-xs font-bold py-2 px-3 rounded-xl block transition-all ${
+        isSuccess ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
+      }`;
+      statusMsg.textContent = text;
+    };
+
     if (saveKeyBtn) {
-      saveKeyBtn.onclick = () => {
-        const key = document.getElementById('setting-api-key')?.value || '';
+      saveKeyBtn.onclick = (e) => {
+        e.preventDefault();
+        const key = document.getElementById('setting-api-key')?.value?.trim() || '';
         Store.saveApiKey(key);
-        alert('Gemini APIキーを端末に安全に保存しました！');
+
+        // ボタンのフィードバック
+        const origText = saveKeyBtn.textContent;
+        saveKeyBtn.textContent = '✅ 保存完了！';
+        saveKeyBtn.classList.remove('bg-gray-800');
+        saveKeyBtn.classList.add('bg-emerald-600');
+
+        showApiKeyStatus(key ? '✅ APIキーを端末に保存しました（次回も保持されます）' : 'ℹ️ APIキーを消去しました（モックモードで動作します）', true);
+
+        setTimeout(() => {
+          saveKeyBtn.textContent = origText;
+          saveKeyBtn.classList.remove('bg-emerald-600');
+          saveKeyBtn.classList.add('bg-gray-800');
+        }, 2000);
       };
     }
 
     // API接続テスト
     const testKeyBtn = document.getElementById('test-api-key-btn');
     if (testKeyBtn) {
-      testKeyBtn.onclick = async () => {
-        const key = document.getElementById('setting-api-key')?.value || '';
+      testKeyBtn.onclick = async (e) => {
+        e.preventDefault();
+        const key = document.getElementById('setting-api-key')?.value?.trim() || '';
         const originalText = testKeyBtn.textContent;
         testKeyBtn.disabled = true;
-        testKeyBtn.textContent = '接続中...';
+        testKeyBtn.textContent = '⏳ 通信中...';
+        showApiKeyStatus('Gemini APIと接続テストを実行中...', true);
+
         try {
           const res = await ApiClient.testConnection(key);
-          alert(res.message);
+          showApiKeyStatus(res.message, res.success);
+        } catch (err) {
+          showApiKeyStatus(`エラーが発生しました: ${err.message}`, false);
         } finally {
           testKeyBtn.disabled = false;
           testKeyBtn.textContent = originalText;
