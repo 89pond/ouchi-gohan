@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="ja" data-theme="orange">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>スマート食事提案アプリ</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-[#fafaf9] text-gray-800 antialiased selection:bg-orange-200">
+
+  <!-- 全体ラッパー（利き手切替用クラスが付与される） -->
+  <div id="app-wrapper" class="min-h-screen max-w-md mx-auto relative pb-24 hand-mode-right bg-white shadow-xl flex flex-col justify-between">
+
+    <!-- 上部ヘッダー (ワンタップ利き手切替 & ハンバーガーメニュー) -->
+    <header class="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-gray-100 px-3 py-2.5 flex items-center justify-between">
+      <!-- 利き手左手モード用ハンバーガー位置 -->
+      <button id="drawer-toggle-btn-left" class="drawer-toggle hidden p-2 rounded-xl text-gray-700 hover:bg-gray-100 active:scale-95 transition-all text-xl">
+        ☰
+      </button>
+
+      <div class="flex items-center space-x-2">
+        <span class="text-2xl">🍽️</span>
+        <div>
+          <h1 class="text-sm font-black tracking-tight text-gray-900 leading-none">おうちごはん AI</h1>
+          <p class="text-[9px] text-gray-400 font-semibold mt-0.5">5大栄養素 ＆ 取り分け献立</p>
+        </div>
+      </div>
+
+      <!-- ワンタップ利き手切替ボタン & 右手用ハンバーガー -->
+      <div class="flex items-center space-x-1.5">
+        <button id="quick-hand-toggle-btn" class="px-2.5 py-1 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-[11px] active:scale-95 transition-all flex items-center space-x-1">
+          <span id="quick-hand-icon">✋</span>
+          <span id="quick-hand-label">右手</span>
+        </button>
+        <button id="drawer-toggle-btn-right" class="drawer-toggle p-2 rounded-xl text-gray-700 hover:bg-gray-100 active:scale-95 transition-all text-xl">
+          ☰
+        </button>
+      </div>
+    </header>
+
+    <!-- スライドイン式ハンバーガードロワーメニュー -->
+    <div id="drawer-overlay" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-xs transition-opacity">
+      <div id="drawer-menu" class="absolute top-0 bottom-0 w-64 bg-white shadow-2xl p-5 flex flex-col justify-between transition-transform transform">
+        <div>
+          <div class="drawer-header flex items-center justify-between pb-4 border-b border-gray-100">
+            <h2 class="font-black text-gray-800 text-base">メニュー</h2>
+            <button id="drawer-close-btn" class="text-gray-400 hover:text-gray-700 p-1.5 text-2xl leading-none">&times;</button>
+          </div>
+          <nav class="mt-4 space-y-2">
+            <button data-drawer-tab="dashboard" class="w-full p-3 rounded-xl flex items-center space-x-3 text-sm font-bold text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-all text-left">
+              <span class="text-xl">📊</span>
+              <span>ダッシュボード (5大栄養素)</span>
+            </button>
+            <button data-drawer-tab="nutrition" class="w-full p-3 rounded-xl flex items-center space-x-3 text-sm font-bold text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-all text-left">
+              <span class="text-xl">📝</span>
+              <span>食事記録・撮影</span>
+            </button>
+            <button data-drawer-tab="recipe" class="w-full p-3 rounded-xl flex items-center space-x-3 text-sm font-bold text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-all text-left">
+              <span class="text-xl">🍳</span>
+              <span>AI献立・レシピ提案</span>
+            </button>
+            <button data-drawer-tab="inventory" class="w-full p-3 rounded-xl flex items-center space-x-3 text-sm font-bold text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-all text-left">
+              <span class="text-xl">🥗</span>
+              <span>食材在庫・レシート</span>
+            </button>
+            <button data-drawer-tab="settings" class="w-full p-3 rounded-xl flex items-center space-x-3 text-sm font-bold text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-all text-left">
+              <span class="text-xl">⚙️</span>
+              <span>家族設定・操作性</span>
+            </button>
+          </nav>
+        </div>
+        <div class="pt-4 border-t border-gray-100 text-[10px] text-gray-400 text-center font-medium">
+          おうちごはん AI v1.2
+        </div>
+      </div>
+    </div>
+
+    <!-- メインコンテンツ領域 -->
+    <main class="flex-1 px-4 py-3 overflow-y-auto">
+
+      <!-- ================= タブ 1: 食材在庫 & レシート ================= -->
+      <section id="tab-panel-inventory" class="tab-panel hidden animate-fade-in space-y-4">
+        <!-- レシート読み取りバナー -->
+        <div class="p-4 rounded-2xl bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-100 flex items-center justify-between shadow-xs">
+          <div class="pr-3">
+            <h3 class="font-bold text-gray-800 text-sm">📸 レシートで一括登録</h3>
+            <p class="text-xs text-gray-500 mt-0.5">AIが食品のみを自動抽出して在庫化</p>
+          </div>
+          <label class="cursor-pointer px-4 py-2.5 rounded-xl font-bold text-xs text-white theme-primary-bg shadow-sm active:scale-95 transition-all shrink-0">
+            レシート撮影
+            <input type="file" id="receipt-file-input" accept="image/*" capture="environment" class="hidden">
+          </label>
+        </div>
+
+        <!-- 手持ち食材リストヘッダー -->
+        <div class="flex items-center justify-between pt-1">
+          <h2 class="font-bold text-gray-800 text-sm flex items-center space-x-1.5">
+            <span>🥗 冷蔵庫の在庫</span>
+          </h2>
+          <button id="open-manual-add-btn" class="text-xs font-semibold theme-primary-text flex items-center space-x-0.5 hover:underline">
+            <span>＋ 手動で追加</span>
+          </button>
+        </div>
+
+        <!-- 食材カード一覧コンテナ -->
+        <div id="inventory-list-container">
+          <!-- inventory.js から動的レンダリング -->
+        </div>
+      </section>
+
+
+      <!-- ================= タブ 2: AIレシピ提案 ================= -->
+      <section id="tab-panel-recipe" class="tab-panel hidden animate-fade-in space-y-3">
+        <!-- 提案切替サブタブ -->
+        <div class="flex p-1 bg-gray-100 rounded-xl">
+          <button id="recipe-tab-suggest" class="flex-1 py-1.5 rounded-lg text-xs font-bold theme-primary-bg text-white transition-all shadow-xs">
+            ✨ 献立提案
+          </button>
+          <button id="recipe-tab-hall" class="flex-1 py-1.5 rounded-lg text-xs font-bold text-gray-600 hover:text-gray-900 transition-all">
+            ⭐ 殿堂入り献立
+          </button>
+        </div>
+
+        <!-- 提案条件セレクター (気分・ジャンル ＆ 調理手順スタイル ＆ 作成人数) -->
+        <div class="bg-white p-2.5 rounded-2xl border border-gray-100 shadow-xs space-y-2">
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[10px] font-bold text-gray-500 mb-0.5">🍽️ 気分・ジャンル</label>
+              <select id="recipe-genre-select" class="w-full text-xs p-1.5 rounded-xl border border-gray-200 bg-gray-50 font-bold focus:bg-white theme-primary-text focus:outline-none">
+                <option value="auto" selected>✨ おまかせ (初期値)</option>
+                <option value="japanese">🍱 和食</option>
+                <option value="chinese">🥟 中華</option>
+                <option value="italian">🍝 イタリアン</option>
+                <option value="french">🥖 洋食・フレンチ</option>
+                <option value="ethnic">🍛 エスニック</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-gray-500 mb-0.5">🍳 手順の出し方</label>
+              <select id="recipe-step-mode-select" class="w-full text-xs p-1.5 rounded-xl border border-gray-200 bg-gray-50 font-bold focus:bg-white text-gray-800 focus:outline-none">
+                <option value="combined" selected>👨‍🍳 まとめて同時進行</option>
+                <option value="by_course">📑 品目別ごとに個別</option>
+              </select>
+            </div>
+          </div>
+          <div class="pt-1.5 border-t border-gray-100 flex items-center justify-between">
+            <label class="text-[11px] font-bold text-gray-700 flex items-center space-x-1">
+              <span>👥 作成人数:</span>
+              <span class="text-[9px] text-gray-400 font-normal">（家族構成から自動設定）</span>
+            </label>
+            <select id="recipe-servings-select" class="text-xs px-2.5 py-1 rounded-xl border border-gray-200 bg-gray-50 font-black theme-primary-text focus:bg-white focus:outline-none">
+              <option value="1.0">👤 1.0人分</option>
+              <option value="1.5">👤 1.5人分</option>
+              <option value="2.0">👥 2.0人分 (大人2)</option>
+              <option value="2.5" selected>👨‍👩‍👧 2.5人分 (大人2+幼児1)</option>
+              <option value="3.0">👨‍👩‍👧 3.0人分 (大人3/大人2+学1)</option>
+              <option value="3.5">👨‍👩‍👧‍👦 3.5人分 (大人2+子2)</option>
+              <option value="4.0">👨‍👩‍👧‍👦 4.0人分 (大人2+盛1等)</option>
+              <option value="4.5">👨‍👩‍👧‍👦 4.5人分 (大家族)</option>
+              <option value="5.0">🍱 5.0人分以上 (作り置き)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- レシピコンテンツ表示コンテナ -->
+        <div id="recipe-content-container">
+          <!-- recipe.js から動的レンダリング -->
+        </div>
+      </section>
+
+
+      <!-- ================= タブ 0: 📊 ダッシュボード (初期画面・スクロールゼロ設計) ================= -->
+      <section id="tab-panel-dashboard" class="tab-panel animate-fade-in space-y-2.5">
+        <!-- 日付切り替えセレクター (過去の日付のチャートも閲覧可能) -->
+        <div class="flex items-center justify-between bg-white p-2 rounded-xl border border-gray-100 shadow-xs text-xs">
+          <button id="dash-prev-day-btn" class="px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 font-bold active:scale-95 transition-all">◀ 前日</button>
+          <div class="text-center">
+            <span id="dash-current-date-label" class="font-black text-gray-800 text-xs">2026/09/09 (今日)</span>
+          </div>
+          <button id="dash-next-day-btn" class="px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 font-bold active:scale-95 transition-all">翌日 ▶</button>
+        </div>
+
+        <!-- 5大栄養素レーダーチャート (目標 vs 現在) -->
+        <div class="bg-white p-3 rounded-2xl border border-gray-100 shadow-xs">
+          <div class="flex items-center justify-between mb-0.5">
+            <h3 class="font-black text-gray-800 text-xs">🎯 1日の5大栄養素バランス</h3>
+            <span id="radar-mode-badge" class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-50 text-amber-700 border border-amber-200">
+              🎯 目標基準
+            </span>
+          </div>
+
+          <!-- レーダーチャート描画エリア (SVG直接描画) -->
+          <div id="nutrition-radar-container" class="w-full flex items-center justify-center py-0.5">
+            <!-- app.bundle.js から動的生成 -->
+          </div>
+
+          <!-- 本日の合計摂取量ラベル (エネルギーも日本語明記) -->
+          <div class="mt-1 pt-1.5 border-t border-gray-100 flex items-center justify-between text-xs">
+            <span class="text-[10px] text-gray-400 font-bold">栄養累計:</span>
+            <div id="today-compact-summary" class="font-medium text-xs text-gray-700">
+              <!-- app.bundle.js から動的生成 -->
+            </div>
+          </div>
+        </div>
+
+        <!-- クイックアクションリンク -->
+        <div class="flex space-x-2 pt-1">
+          <button data-tab-target="nutrition" class="flex-1 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold active:scale-95 transition-all flex items-center justify-center space-x-1">
+            <span>📸 食事を記録する</span>
+          </button>
+          <button data-tab-target="recipe" class="flex-1 py-2 rounded-xl theme-primary-light-bg theme-primary-text font-bold text-xs active:scale-95 transition-all flex items-center justify-center space-x-1">
+            <span>🍳 献立を提案</span>
+          </button>
+        </div>
+      </section>
+
+
+      <!-- ================= タブ 3: 📝 食事記録 (登録・履歴・Life Peak連携) ================= -->
+      <section id="tab-panel-nutrition" class="tab-panel hidden animate-fade-in space-y-3">
+        <!-- 撮影アクションバー -->
+        <div class="p-4 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-100 flex items-center justify-between shadow-xs">
+          <div>
+            <h4 class="font-bold text-gray-800 text-sm">📸 食事写真から自動解析</h4>
+            <p class="text-xs text-gray-500 mt-0.5">カロリー・PFCをAIが推計して記録</p>
+          </div>
+          <label class="cursor-pointer px-4 py-2.5 rounded-xl font-bold text-xs text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs active:scale-95 transition-all shrink-0">
+            写真を解析
+            <input type="file" id="meal-photo-input" accept="image/*" capture="environment" class="hidden">
+          </label>
+        </div>
+
+        <!-- 食事ログ履歴ヘッダー & 記録アプリ連携エクスポートボタン (設定でON時のみ表示) -->
+        <div class="flex items-center justify-between pt-1">
+          <h4 class="font-bold text-xs text-gray-700">食事ログ履歴</h4>
+          <button id="btn-export-life-peak" class="hidden text-[11px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg border border-blue-200 transition-all flex items-center space-x-1">
+            <span>🔄 記録アプリ用に出力</span>
+          </button>
+        </div>
+
+        <!-- 食事履歴リスト -->
+        <div id="nutrition-logs-container" class="space-y-2">
+          <!-- app.bundle.js からレンダリング -->
+        </div>
+      </section>
+
+
+      <!-- ================= タブ 4: 家族設定 & BYOK ================= -->
+      <section id="tab-panel-settings" class="tab-panel hidden animate-fade-in space-y-4">
+        <form id="settings-form" class="space-y-4">
+          <!-- 操作性・UI設定（親指ゾーン & テーマ） -->
+          <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs space-y-3">
+            <h3 class="font-bold text-gray-800 text-sm flex items-center space-x-1.5">
+              <span>📱 操作性 ＆ テーマ設定</span>
+            </h3>
+
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-1">アプリ起動時の初期画面</label>
+              <select id="setting-initial-tab" class="w-full text-xs p-2.5 rounded-xl border border-gray-200 bg-gray-50 font-medium focus:bg-white">
+                <option value="dashboard">📊 ダッシュボード (5大栄養素・デフォルト)</option>
+                <option value="nutrition">📝 食事記録・撮影</option>
+                <option value="recipe">🍳 AI献立・レシピ提案</option>
+                <option value="inventory">🥗 食材在庫・レシート</option>
+                <option value="settings">⚙️ 家族設定・プロファイル</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-1">利き手操作モード (ワンタップ切替も可能)</label>
+              <select id="setting-hand-mode" class="w-full text-xs p-2.5 rounded-xl border border-gray-200 bg-gray-50 font-medium focus:bg-white">
+                <option value="right">右手操作モード (閉じるボタン・FABが右)</option>
+                <option value="left">左手操作モード (閉じるボタン・FABが左)</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-1">カラーテーマ</label>
+              <select id="setting-theme" class="w-full text-xs p-2.5 rounded-xl border border-gray-200 bg-gray-50 font-medium focus:bg-white">
+                <option value="orange">🍊 ウォーム・オレンジ (家庭的・温かみ)</option>
+                <option value="green">🥑 フレッシュ・グリーン (健康・オーガニック)</option>
+                <option value="modern">☕ カーム・モダン (カフェ風・シンプル)</option>
+                <option value="dark">🌙 ダークモード (夜間・目に優しい)</option>
+              </select>
+            </div>
+
+            <!-- 調理手順の出力形式（まとめて同時 or 品目別） -->
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-1">🍳 調理手順の出力スタイル</label>
+              <select id="setting-cooking-step-mode" class="w-full text-xs p-2.5 rounded-xl border border-gray-200 bg-gray-50 font-medium focus:bg-white">
+                <option value="combined">👨‍🍳 まとめて同時進行 (推奨: 一度の加熱で主食・主菜・副菜・汁物・子ども分を一気通貫)</option>
+                <option value="by_course">📑 品目別ごとに個別出力 (主菜・副菜・汁物それぞれ個別の手順で作りたい場合)</option>
+              </select>
+              <p class="text-[10px] text-gray-400 mt-1">※AIへの献立生成指示に反映され、レシピの出力形式が切り替わります。</p>
+            </div>
+
+            <!-- 外部記録アプリ連携設定 -->
+            <div class="pt-2 border-t border-gray-100">
+              <label class="flex items-center space-x-2 text-xs font-bold text-gray-700 cursor-pointer">
+                <input type="checkbox" id="setting-enable-sync" class="w-4 h-4 rounded text-blue-600">
+                <span>外部記録アプリ（仮称: Life Peak）と連携する</span>
+              </label>
+              <p class="text-[10px] text-gray-400 mt-1 pl-6">
+                ONにすると、食事記録画面に「記録アプリ用に出力」ボタンが表示され、日々の栄養データを外部アプリへ連携できるようになります。
+              </p>
+            </div>
+          </div>
+
+          <!-- 家族プロファイル設定 (複数人大人目的 ＆ 複数子ども登録 ＆ 基本作成人数) -->
+          <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs space-y-3">
+            <h3 class="font-bold text-gray-800 text-sm flex items-center space-x-1.5">
+              <span>👨‍👩‍👧 家族プロファイル ＆ 食事ボリューム自動計算</span>
+            </h3>
+
+            <!-- 大人の人数・食事タイプ設定 -->
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div class="p-2.5 rounded-xl bg-gray-50 border border-gray-100">
+                <label class="block font-bold text-gray-700 mb-1">大人（標準）</label>
+                <div class="flex items-center space-x-1">
+                  <select id="setting-adult-count" class="w-full p-1.5 rounded-lg border border-gray-200 bg-white font-black theme-primary-text text-xs focus:outline-none">
+                    <option value="0">0人</option>
+                    <option value="1">1人 (1.0人前)</option>
+                    <option value="2" selected>2人 (2.0人前)</option>
+                    <option value="3">3人 (3.0人前)</option>
+                    <option value="4">4人 (4.0人前)</option>
+                  </select>
+                </div>
+                <span class="text-[9px] text-gray-400 block mt-0.5">※1人あたり1.0人前換算</span>
+              </div>
+
+              <div class="p-2.5 rounded-xl bg-gray-50 border border-gray-100">
+                <label class="block font-bold text-gray-700 mb-1">食べ盛り・中高生</label>
+                <div class="flex items-center space-x-1">
+                  <select id="setting-growth-count" class="w-full p-1.5 rounded-lg border border-gray-200 bg-white font-black theme-primary-text text-xs focus:outline-none">
+                    <option value="0" selected>0人</option>
+                    <option value="1">1人 (1.5人前)</option>
+                    <option value="2">2人 (3.0人前)</option>
+                    <option value="3">3人 (4.5人前)</option>
+                  </select>
+                </div>
+                <span class="text-[9px] text-gray-400 block mt-0.5">※大盛り 1.5人前換算</span>
+              </div>
+            </div>
+
+            <!-- 子どもの登録 (生年月入力で月齢・ステージ・食事量を全自動計算) -->
+            <div class="pt-2 border-t border-gray-100">
+              <div class="flex justify-between items-center mb-1">
+                <div>
+                  <label class="text-xs font-bold text-gray-700 block">子どもの登録 (生年月から月齢・分量を自動判定)</label>
+                  <span class="text-[10px] text-gray-400">生年月を入れると現在の月齢・取り分けステージを自動計算します</span>
+                </div>
+                <button type="button" id="btn-add-child" class="text-[11px] font-bold theme-primary-text hover:underline shrink-0">＋ 追加</button>
+              </div>
+              <div id="children-list-container" class="space-y-2 mt-2">
+                <!-- 動的レンダリング: お名前 + 生年月 (YYYY-MM) + 自動計算バッジ -->
+              </div>
+              <p class="text-[10px] text-rose-500 mt-1">※1歳未満へのハチミツ禁止・誤飲防止加工は全自動適用されます。</p>
+            </div>
+
+            <!-- 自動計算された世帯推奨ボリューム表示バナー -->
+            <div class="p-3 rounded-xl bg-orange-50/70 border border-orange-200 text-xs flex items-center justify-between">
+              <div>
+                <span class="text-[10px] font-bold text-orange-700 block">💡 家族構成からの自動計算ボリューム</span>
+                <span id="household-servings-detail" class="text-[11px] text-gray-600">大人2人 + 幼児1人</span>
+              </div>
+              <div class="text-right">
+                <span id="household-servings-total" class="text-base font-black theme-primary-text">2.5人分</span>
+                <span class="text-[9px] text-gray-400 block">（献立の初期値）</span>
+              </div>
+            </div>
+
+            <!-- 大人の健康目的 (複数選択チェックボックス) -->
+            <div class="pt-2 border-t border-gray-100">
+              <label class="block text-xs font-bold text-gray-700 mb-1.5">大人の健康目的 (複数選択可: 両親・祖父母・成人子など)</label>
+              <div class="grid grid-cols-2 gap-2 text-xs">
+                <label class="flex items-center space-x-2 p-2 rounded-xl bg-gray-50 border border-gray-100 cursor-pointer">
+                  <input type="checkbox" name="adult_goal_check" value="general" class="rounded text-orange-500">
+                  <span>一般・バランス重視</span>
+                </label>
+                <label class="flex items-center space-x-2 p-2 rounded-xl bg-gray-50 border border-gray-100 cursor-pointer">
+                  <input type="checkbox" name="adult_goal_check" value="athlete" class="rounded text-orange-500">
+                  <span>アスリート (高タンパク)</span>
+                </label>
+                <label class="flex items-center space-x-2 p-2 rounded-xl bg-gray-50 border border-gray-100 cursor-pointer">
+                  <input type="checkbox" name="adult_goal_check" value="diet" class="rounded text-orange-500">
+                  <span>ダイエット (低糖・低脂)</span>
+                </label>
+                <label class="flex items-center space-x-2 p-2 rounded-xl bg-gray-50 border border-gray-100 cursor-pointer">
+                  <input type="checkbox" name="adult_goal_check" value="health" class="rounded text-orange-500">
+                  <span>健康管理 (減塩・血糖値)</span>
+                </label>
+              </div>
+            </div>
+
+            <button type="submit" class="w-full py-2.5 rounded-xl text-white font-bold text-xs theme-primary-bg shadow-xs active:scale-95 transition-all mt-2">
+              家族設定を保存する
+            </button>
+          </div>
+
+          <!-- BYOK (Gemini APIキー) 設定 -->
+          <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs space-y-3">
+            <h3 class="font-bold text-gray-800 text-sm flex items-center space-x-1.5">
+              <span>🔑 Gemini API設定 (BYOK)</span>
+            </h3>
+            <p class="text-xs text-gray-500">
+              ご自身のGoogle AI StudioのAPIキーを登録すると、本物のGemini 1.5 Flashで無制限に高精度解析が行えます（空欄時は高品質モックで動作）。
+            </p>
+            <div>
+              <input type="password" id="setting-api-key" placeholder="AIzaSy..." class="w-full text-xs p-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white font-mono">
+            </div>
+            <div class="flex space-x-2">
+              <button type="button" id="save-api-key-btn" class="flex-1 py-2 rounded-xl text-xs font-bold bg-gray-800 text-white hover:bg-black transition-all">
+                キーを端末に保存
+              </button>
+              <button type="button" id="test-api-key-btn" class="px-3.5 py-2 rounded-xl text-xs font-bold border border-gray-300 hover:bg-gray-50 transition-all">
+                接続テスト
+              </button>
+            </div>
+          </div>
+
+          <!-- データバックアップ ＆ 復元 -->
+          <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs space-y-3">
+            <h3 class="font-bold text-gray-800 text-sm">💾 データのバックアップ ＆ 復元</h3>
+            <p class="text-xs text-gray-500">
+              端末の変更や万が一のデータ消失に備えて、全データ（在庫・殿堂入りレシピ・食事ログ）をファイルに保存・復元できます。
+            </p>
+            <div class="flex space-x-2">
+              <button type="button" id="export-backup-btn" class="flex-1 py-2 rounded-xl text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition-all">
+                📥 データを書き出す
+              </button>
+              <label class="flex-1 py-2 rounded-xl text-xs font-bold text-center border border-gray-300 hover:bg-gray-50 transition-all cursor-pointer">
+                📤 データを復元
+                <input type="file" id="import-backup-input" accept=".json" class="hidden">
+              </label>
+            </div>
+          </div>
+        </form>
+      </section>
+
+    </main>
+
+    <!-- フローティングアクションボタン (FAB: 片手親指ゾーン - 食材手動追加) -->
+    <button id="inventory-fab" class="fab-button fixed bottom-20 z-40 px-4 py-3.5 rounded-2xl shadow-lg text-white theme-primary-bg active:scale-95 transition-all flex items-center justify-center space-x-1.5 hidden">
+      <span class="text-base font-black leading-none">＋</span>
+      <span class="text-xs font-bold">食材を追加</span>
+    </button>
+
+    <!-- 下部親指ゾーン ナビゲーションバー -->
+    <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto z-40 bg-white/95 backdrop-blur border-t border-gray-100 px-2 py-2 flex justify-around items-center">
+      <button data-tab-target="dashboard" class="flex-1 py-1 flex flex-col items-center justify-center space-y-0.5 theme-primary-text font-black text-xs transition-all">
+        <span class="text-xl">📊</span>
+        <span>分析</span>
+      </button>
+      <button data-tab-target="nutrition" class="flex-1 py-1 flex flex-col items-center justify-center space-y-0.5 text-gray-400 font-medium text-xs hover:text-gray-600 transition-all">
+        <span class="text-xl">📝</span>
+        <span>記録</span>
+      </button>
+      <button data-tab-target="recipe" class="flex-1 py-1 flex flex-col items-center justify-center space-y-0.5 text-gray-400 font-medium text-xs hover:text-gray-600 transition-all">
+        <span class="text-xl">🍳</span>
+        <span>献立</span>
+      </button>
+      <button data-tab-target="inventory" class="flex-1 py-1 flex flex-col items-center justify-center space-y-0.5 text-gray-400 font-medium text-xs hover:text-gray-600 transition-all">
+        <span class="text-xl">🥗</span>
+        <span>在庫</span>
+      </button>
+      <button data-tab-target="settings" class="flex-1 py-1 flex flex-col items-center justify-center space-y-0.5 text-gray-400 font-medium text-xs hover:text-gray-600 transition-all">
+        <span class="text-xl">⚙️</span>
+        <span>設定</span>
+      </button>
+    </nav>
+
+    <!-- ================= モーダル群 ================= -->
+
+    <!-- 1. レシートOCR確認・編集モーダル (HITL) -->
+    <div id="receipt-confirm-modal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 max-h-[85vh] flex flex-col shadow-2xl animate-fade-in">
+        <div class="modal-header flex items-center justify-between pb-3 border-b border-gray-100">
+          <div>
+            <h3 class="font-bold text-gray-800 text-base">🛒 食材の確認と一括登録</h3>
+            <p class="text-xs text-gray-400">不要なものはチェックを外せます</p>
+          </div>
+          <button id="receipt-confirm-cancel-btn" class="text-gray-400 hover:text-gray-700 p-2 text-2xl leading-none">&times;</button>
+        </div>
+        <div id="receipt-items-list" class="flex-1 overflow-y-auto py-3 space-y-2">
+          <!-- ocr.js から動的生成 -->
+        </div>
+        <div class="pt-3 border-t border-gray-100 flex space-x-2">
+          <button id="receipt-confirm-save-btn" class="w-full py-3 rounded-xl text-white font-bold text-xs theme-primary-bg shadow-sm active:scale-95 transition-all">
+            チェックした食材を在庫に追加する
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. 食事画像解析モーダル (スライダー補正付き) -->
+    <div id="meal-analysis-modal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 max-h-[90vh] flex flex-col shadow-2xl animate-fade-in">
+        <div class="modal-header flex items-center justify-between pb-2 border-b border-gray-100">
+          <h3 class="font-bold text-gray-800 text-base">🍽️ 食事解析結果</h3>
+          <button id="analysis-cancel-btn" class="text-gray-400 hover:text-gray-700 p-2 text-2xl leading-none">&times;</button>
+        </div>
+        <div class="flex-1 overflow-y-auto py-3 space-y-3">
+          <img id="analysis-image-preview" class="w-full h-40 object-cover rounded-xl border border-gray-100" src="" alt="料理写真">
+          <div>
+            <h4 id="analysis-dish-name" class="font-black text-gray-800 text-lg">料理名</h4>
+            <p id="analysis-feedback" class="text-xs text-gray-500 mt-1 leading-relaxed bg-gray-50 p-2.5 rounded-xl border border-gray-100"></p>
+          </div>
+
+          <!-- PFC表示カード -->
+          <div class="grid grid-cols-4 gap-2 text-center">
+            <div class="p-2 rounded-xl bg-orange-50 border border-orange-100">
+              <div class="text-[10px] text-gray-400">カロリー</div>
+              <div id="val-cal" class="font-bold text-xs text-orange-600">520 kcal</div>
+            </div>
+            <div class="p-2 rounded-xl bg-blue-50 border border-blue-100">
+              <div class="text-[10px] text-gray-400">タンパク質</div>
+              <div id="val-p" class="font-bold text-xs text-blue-600">26g</div>
+            </div>
+            <div class="p-2 rounded-xl bg-yellow-50 border border-yellow-100">
+              <div class="text-[10px] text-gray-400">脂質</div>
+              <div id="val-f" class="font-bold text-xs text-amber-600">20g</div>
+            </div>
+            <div class="p-2 rounded-xl bg-purple-50 border border-purple-100">
+              <div class="text-[10px] text-gray-400">炭水化物</div>
+              <div id="val-c" class="font-bold text-xs text-purple-600">58g</div>
+            </div>
+          </div>
+
+          <!-- ボリューム補正スライダー -->
+          <div class="bg-gray-50 p-3 rounded-xl border border-gray-200">
+            <div class="flex justify-between text-xs font-bold text-gray-700 mb-1">
+              <span>実食ボリューム補正</span>
+              <span id="volume-scale-label" class="theme-primary-text">100% (普通)</span>
+            </div>
+            <input type="range" id="volume-slider" min="0.5" max="1.5" step="0.1" value="1.0" class="w-full accent-orange-500">
+            <div class="flex justify-between text-[10px] text-gray-400 mt-1">
+              <span>小盛り (50%)</span>
+              <span>普通 (100%)</span>
+              <span>大盛り (150%)</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-gray-100">
+          <button id="analysis-save-log-btn" class="w-full py-3 rounded-xl text-white font-bold text-xs theme-primary-bg shadow-sm active:scale-95 transition-all">
+            この内容で食事ログに記録する
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. 食材手動追加モーダル -->
+    <div id="manual-add-modal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl animate-fade-in">
+        <div class="flex items-center justify-between pb-3 border-b border-gray-100">
+          <h3 class="font-bold text-gray-800 text-base">🥗 食材を手動で追加</h3>
+          <button id="manual-add-cancel-btn" class="text-gray-400 p-1 text-lg">&times;</button>
+        </div>
+        <form id="manual-add-form" class="py-3 space-y-3">
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">食材名 (例: 豚肉、にんじん)</label>
+            <input type="text" id="manual-item-name" required class="w-full text-xs p-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white">
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-1">カテゴリ</label>
+              <select id="manual-item-cat" class="w-full text-xs p-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white">
+                <option value="野菜">野菜</option>
+                <option value="肉類">肉類</option>
+                <option value="魚介">魚介</option>
+                <option value="卵・大豆">卵・大豆</option>
+                <option value="乳製品">乳製品</option>
+                <option value="その他">その他</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-1">数量 (例: 1本、200g)</label>
+              <input type="text" id="manual-item-qty" value="1個" class="w-full text-xs p-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white">
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">消費期限の目安 (あと何日)</label>
+            <input type="number" id="manual-item-exp" value="3" min="0" max="60" class="w-full text-xs p-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white">
+          </div>
+          <div class="pt-2">
+            <button type="submit" class="w-full py-3 rounded-xl text-white font-bold text-xs theme-primary-bg shadow-sm active:scale-95 transition-all">
+              在庫に追加する
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- グローバルローディングインジケーター -->
+    <div id="global-loading" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex flex-col items-center justify-center p-4">
+      <div class="bg-white p-6 rounded-2xl shadow-2xl flex flex-col items-center space-y-3 max-w-xs text-center animate-fade-in">
+        <div class="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+        <p id="global-loading-text" class="text-xs font-bold text-gray-800">AIが処理中...</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- JavaScript統合バンドル（CORS制限のない完全ローカル対応） -->
+  <script src="js/app.bundle.js"></script>
+</body>
+</html>

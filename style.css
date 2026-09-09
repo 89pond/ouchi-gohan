@@ -1,0 +1,498 @@
+/* style.css - テーマカラー (3色) & 利き手切替 (片手親指ゾーン) スタイル */
+
+:root {
+  /* テーマ1: ウォーム・オレンジ (デフォルト) */
+  --primary: #f97316;
+  --primary-hover: #ea580c;
+  --primary-light: #ffedd5;
+  --primary-text: #9a3412;
+  --bg-main: #fafaf9;
+  --card-bg: #ffffff;
+  --border-color: #f3f4f6;
+  --accent-child: #ec4899;
+  --accent-adult: #3b82f6;
+  --accent-alert: #ef4444;
+}
+
+/* テーマ2: フレッシュ・グリーン */
+[data-theme="green"] {
+  --primary: #10b981;
+  --primary-hover: #059669;
+  --primary-light: #d1fae5;
+  --primary-text: #065f46;
+  --bg-main: #f4fdf8;
+  --card-bg: #ffffff;
+  --border-color: #e5e7eb;
+  --accent-child: #f43f5e;
+  --accent-adult: #0284c7;
+}
+
+/* テーマ3: カーム・モダン */
+[data-theme="modern"] {
+  --primary: #64748b;
+  --primary-hover: #475569;
+  --primary-light: #f1f5f9;
+  --primary-text: #1e293b;
+  --bg-main: #f8fafc;
+  --card-bg: #ffffff;
+  --border-color: #e2e8f0;
+  --accent-child: #e11d48;
+  --accent-adult: #4f46e5;
+}
+
+/* テーマ4: 🌙 ダークモード */
+[data-theme="dark"] {
+  --primary: #fb923c;
+  --primary-hover: #f97316;
+  --primary-light: #27272a;
+  --primary-text: #fed7aa;
+  --bg-main: #09090b;
+  --card-bg: #18181b;
+  --border-color: #27272a;
+  --accent-child: #f43f5e;
+  --accent-adult: #38bdf8;
+}
+[data-theme="dark"] body {
+  background-color: #09090b !important;
+  color: #f4f4f5 !important;
+}
+
+/* メインラッパー & カード全般 */
+#app-wrapper {
+  background-color: var(--card-bg);
+}
+
+[data-theme="dark"] #app-wrapper {
+  background-color: #18181b !important;
+  color: #f4f4f5 !important;
+  border-color: #27272a !important;
+}
+
+[data-theme="dark"] .bg-white {
+  background-color: #18181b !important;
+  color: #f4f4f5 !important;
+  border-color: #27272a !important;
+}
+
+/* レーダーチャートのダークモード対応 (眩しさ軽減 & 文字発色) */
+[data-theme="dark"] #nutrition-radar-container svg polygon[stroke="#e5e7eb"] {
+  stroke: #3f3f46 !important;
+}
+[data-theme="dark"] #nutrition-radar-container svg polygon[stroke="#9ca3af"] {
+  stroke: #71717a !important;
+}
+[data-theme="dark"] #nutrition-radar-container svg text {
+  fill: #f4f4f5 !important;
+}
+
+/* ヘッダー & ナビゲーションバー (白っぽさ完全解消) */
+[data-theme="dark"] header,
+[data-theme="dark"] nav,
+[data-theme="dark"] .bg-white\/95,
+[data-theme="dark"] .bg-white\/90,
+[data-theme="dark"] .bg-white\/80,
+[data-theme="dark"] .bg-white\/70 {
+  background-color: #121215 !important;
+  color: #f4f4f5 !important;
+  border-color: #27272a !important;
+}
+
+/* ヘッダー内のタイトル「おうちごはん AI」の視認性確保 */
+[data-theme="dark"] header h1 {
+  color: #ffffff !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.02em;
+}
+[data-theme="dark"] header p {
+  color: #a1a1aa !important;
+}
+
+/* クイック利き手ボタン & ハンバーガー & サブタブ (bg-gray-100) */
+[data-theme="dark"] .bg-gray-100,
+[data-theme="dark"] #quick-hand-toggle-btn,
+[data-theme="dark"] .drawer-toggle,
+[data-theme="dark"] #dash-prev-day-btn,
+[data-theme="dark"] #dash-next-day-btn {
+  background-color: #27272a !important;
+  color: #f4f4f5 !important;
+  border-color: #3f3f46 !important;
+}
+[data-theme="dark"] #quick-hand-toggle-btn:hover,
+[data-theme="dark"] .drawer-toggle:hover,
+[data-theme="dark"] #dash-prev-day-btn:hover,
+[data-theme="dark"] #dash-next-day-btn:hover {
+  background-color: #3f3f46 !important;
+}
+
+/* セレクトボックス & 入力フォーム */
+[data-theme="dark"] select,
+[data-theme="dark"] input[type="text"],
+[data-theme="dark"] input[type="number"],
+[data-theme="dark"] input[type="file"] {
+  background-color: #27272a !important;
+  color: #ffffff !important;
+  border-color: #3f3f46 !important;
+}
+[data-theme="dark"] select option {
+  background-color: #18181b !important;
+  color: #ffffff !important;
+}
+
+/* ドロワーメニュー */
+[data-theme="dark"] #drawer-menu {
+  background-color: #18181b !important;
+  border-color: #27272a !important;
+}
+[data-theme="dark"] [data-drawer-tab] {
+  color: #e4e4e7 !important;
+}
+[data-theme="dark"] [data-drawer-tab]:hover {
+  background-color: #27272a !important;
+}
+
+/* 各種半透明・カラーコンテナの反転 */
+[data-theme="dark"] .bg-orange-50\/50,
+[data-theme="dark"] .bg-rose-50\/50,
+[data-theme="dark"] .bg-emerald-50\/50,
+[data-theme="dark"] .bg-amber-50\/50 {
+  background-color: #27272a !important;
+  border-color: #3f3f46 !important;
+}
+[data-theme="dark"] .bg-gray-50,
+[data-theme="dark"] .bg-gray-50\/60 {
+  background-color: #27272a !important;
+  color: #e4e4e7 !important;
+  border-color: #3f3f46 !important;
+}
+[data-theme="dark"] .bg-pink-50,
+[data-theme="dark"] .bg-pink-50\/70,
+[data-theme="dark"] .bg-pink-50\/90 {
+  background-color: #3b1220 !important;
+  border-color: #831843 !important;
+}
+[data-theme="dark"] .bg-blue-50,
+[data-theme="dark"] .bg-blue-50\/70 {
+  background-color: #0c2340 !important;
+  border-color: #1e3a8a !important;
+}
+[data-theme="dark"] .bg-amber-50 {
+  background-color: #331e08 !important;
+  border-color: #78350f !important;
+}
+
+/* ================= バナー群のダークモード高コントラスト化 ================= */
+/* 1. 記録タブ: 食事写真から自動解析バナー */
+[data-theme="dark"] .from-emerald-50.to-teal-50,
+[data-theme="dark"] [class*="from-emerald-50"][class*="to-teal-50"] {
+  background: linear-gradient(135deg, rgba(6, 78, 59, 0.65), rgba(15, 118, 110, 0.5)) !important;
+  border-color: rgba(52, 211, 153, 0.4) !important;
+}
+[data-theme="dark"] .from-emerald-50.to-teal-50 h4,
+[data-theme="dark"] [class*="from-emerald-50"][class*="to-teal-50"] h4 {
+  color: #ffffff !important;
+  font-weight: 900 !important;
+}
+[data-theme="dark"] .from-emerald-50.to-teal-50 p,
+[data-theme="dark"] [class*="from-emerald-50"][class*="to-teal-50"] p {
+  color: #a7f3d0 !important;
+}
+
+/* 2. 食材タブ: レシートで一括登録バナー */
+[data-theme="dark"] .from-orange-50.to-amber-50,
+[data-theme="dark"] [class*="from-orange-50"][class*="to-amber-50"] {
+  background: linear-gradient(135deg, rgba(124, 45, 18, 0.65), rgba(120, 53, 15, 0.5)) !important;
+  border-color: rgba(251, 146, 60, 0.4) !important;
+}
+[data-theme="dark"] .from-orange-50.to-amber-50 h3,
+[data-theme="dark"] [class*="from-orange-50"][class*="to-amber-50"] h3 {
+  color: #ffffff !important;
+  font-weight: 900 !important;
+}
+[data-theme="dark"] .from-orange-50.to-amber-50 p,
+[data-theme="dark"] [class*="from-orange-50"][class*="to-amber-50"] p {
+  color: #fed7aa !important;
+}
+
+/* ================= カード群のダークモード最適化 ================= */
+/* 食材在庫カード & 食事ログカード */
+[data-theme="dark"] #inventory-list-container > div,
+[data-theme="dark"] #nutrition-logs-container > div {
+  background-color: #1f1f24 !important;
+  border-color: #33333d !important;
+}
+[data-theme="dark"] #inventory-list-container > div .text-gray-800,
+[data-theme="dark"] #nutrition-logs-container > div .text-gray-800 {
+  color: #ffffff !important;
+  font-weight: 800 !important;
+}
+
+/* 食材の「使った」ボタン */
+[data-theme="dark"] [data-consume-id] {
+  background-color: rgba(16, 185, 129, 0.25) !important;
+  color: #34d399 !important;
+  border: 1px solid rgba(52, 211, 153, 0.4) !important;
+}
+
+/* 設定画面: チェックボックス枠 & 子ども登録行 */
+[data-theme="dark"] label:has(input[name="adult_goal_check"]),
+[data-theme="dark"] #children-list-container > div {
+  background-color: #27272a !important;
+  border-color: #3f3f46 !important;
+  color: #ffffff !important;
+}
+[data-theme="dark"] #export-backup-btn,
+[data-theme="dark"] label[for="import-backup-input"],
+[data-theme="dark"] label:has(#import-backup-input) {
+  background-color: #27272a !important;
+  border-color: #3f3f46 !important;
+  color: #f4f4f5 !important;
+}
+
+/* モーダル群 (レシートOCR & 食事解析モーダル) */
+[data-theme="dark"] #receipt-confirm-modal > div > div,
+[data-theme="dark"] #meal-analysis-modal > div,
+[data-theme="dark"] #manual-add-modal > div {
+  background-color: #18181b !important;
+  border: 1px solid #3f3f46 !important;
+  color: #f4f4f5 !important;
+}
+
+/* 外部記録アプリ（Life Peak）連携ボタン */
+[data-theme="dark"] #btn-export-life-peak {
+  background-color: rgba(30, 58, 138, 0.3) !important;
+  color: #60a5fa !important;
+  border-color: rgba(59, 130, 246, 0.4) !important;
+}
+
+/* 献立タブ初期表示カード */
+[data-theme="dark"] #recipe-content-container .border-gray-100 {
+  background-color: #1c1c21 !important;
+  border-color: #2e2e38 !important;
+}
+[data-theme="dark"] .text-pink-700,
+[data-theme="dark"] .text-pink-600 {
+  color: #f472b6 !important;
+}
+[data-theme="dark"] .text-blue-700,
+[data-theme="dark"] .text-blue-600 {
+  color: #60a5fa !important;
+}
+[data-theme="dark"] .text-amber-800,
+[data-theme="dark"] .text-amber-700,
+[data-theme="dark"] .text-amber-900 {
+  color: #fbbf24 !important;
+}
+[data-theme="dark"] .text-emerald-700,
+[data-theme="dark"] .text-emerald-600 {
+  color: #34d399 !important;
+}
+[data-theme="dark"] .text-gray-800,
+[data-theme="dark"] .text-gray-900,
+[data-theme="dark"] .text-gray-700 {
+  color: #ffffff !important;
+}
+[data-theme="dark"] h1,
+[data-theme="dark"] h2,
+[data-theme="dark"] h3,
+[data-theme="dark"] h4,
+[data-theme="dark"] h5 {
+  color: #ffffff !important;
+}
+
+/* 献立メインタイトルのダークモード強調（左アクセント線 ＆ 白発色） */
+[data-theme="dark"] .recipe-meal-title {
+  color: #ffffff !important;
+  border-left: 3.5px solid var(--primary);
+  padding-left: 0.5rem;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .text-gray-600,
+[data-theme="dark"] .text-gray-500 {
+  color: #cbd5e1 !important;
+}
+[data-theme="dark"] .text-gray-400 {
+  color: #94a3b8 !important;
+}
+
+/* 所要時間バッジ等のダークモード視認性 */
+[data-theme="dark"] .bg-orange-100 {
+  background-color: rgba(234, 88, 12, 0.25) !important;
+  color: #fdba74 !important;
+  border: 1px solid rgba(251, 146, 60, 0.3) !important;
+}
+
+/* アプリケーション共通 */
+body {
+  background-color: var(--bg-main);
+  color: #1f2937;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+/* 片手操作・親指ゾーン（Thumb Zone）レイアウト */
+.hand-mode-right .fab-button {
+  right: 1.25rem;
+  left: auto;
+}
+
+.hand-mode-left .fab-button {
+  left: 1.25rem;
+  right: auto;
+}
+
+/* ハンバーガーボタンの左右制御 */
+.hand-mode-right #drawer-toggle-btn-right {
+  display: block;
+}
+.hand-mode-right #drawer-toggle-btn-left {
+  display: none;
+}
+.hand-mode-right #drawer-menu {
+  right: 0;
+  left: auto;
+}
+
+.hand-mode-left #drawer-toggle-btn-right {
+  display: none;
+}
+.hand-mode-left #drawer-toggle-btn-left {
+  display: block;
+}
+.hand-mode-left #drawer-menu {
+  left: 0;
+  right: auto;
+}
+
+/* 閉じるボタンの利き手連動配置 */
+.hand-mode-left .modal-header,
+.hand-mode-left .drawer-header {
+  flex-direction: row-reverse;
+}
+
+/* 決定・アクションボタンの親指寄せ */
+.hand-mode-right .primary-action-align {
+  justify-content: flex-end;
+}
+.hand-mode-left .primary-action-align {
+  justify-content: flex-start;
+}
+
+/* テーマカラースタイルユーティリティ */
+.theme-primary-bg {
+  background-color: var(--primary);
+}
+.theme-primary-bg:hover {
+  background-color: var(--primary-hover);
+}
+.theme-primary-light-bg {
+  background-color: var(--primary-light);
+}
+.theme-primary-text {
+  color: var(--primary);
+}
+.theme-primary-border {
+  border-color: var(--primary);
+}
+
+/* スクロールバーの非表示（モバイルライクな体験） */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* アニメーション */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s ease-out forwards;
+}
+
+/* ================= 調理ステップの【】ラベル専用カラーバッジ ================= */
+.step-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.375rem;
+  font-weight: 800;
+  font-size: 0.7rem;
+  line-height: 1.2;
+  border-width: 1px;
+  margin-right: 0.25rem;
+}
+
+/* 主食: オレンジ */
+.step-badge-staple {
+  background-color: #fff7ed;
+  color: #c2410c;
+  border-color: #fed7aa;
+}
+/* 主菜: ローズ・赤 */
+.step-badge-main {
+  background-color: #fff1f2;
+  color: #be123c;
+  border-color: #fecdd3;
+}
+/* 副菜: エメラルド・緑 */
+.step-badge-side {
+  background-color: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+/* 汁物: アンバー・黄 */
+.step-badge-soup {
+  background-color: #fffbeb;
+  color: #b45309;
+  border-color: #fde68a;
+}
+/* 子ども取り分け: ピンク */
+.step-badge-child {
+  background-color: #fdf2f8;
+  color: #be185d;
+  border-color: #fbcfe8;
+}
+/* 共通（下ごしらえ・全員分完成等）: インディゴ/パープル */
+.step-badge-common {
+  background-color: #eef2ff;
+  color: #4338ca;
+  border-color: #c7d2fe;
+}
+
+/* ダークモードでのステップバッジ視認性強化 */
+[data-theme="dark"] .step-badge-staple {
+  background-color: rgba(194, 65, 12, 0.2) !important;
+  color: #fb923c !important;
+  border-color: rgba(251, 146, 60, 0.4) !important;
+}
+[data-theme="dark"] .step-badge-main {
+  background-color: rgba(190, 18, 60, 0.2) !important;
+  color: #fb7185 !important;
+  border-color: rgba(251, 113, 133, 0.4) !important;
+}
+[data-theme="dark"] .step-badge-side {
+  background-color: rgba(4, 120, 87, 0.2) !important;
+  color: #34d399 !important;
+  border-color: rgba(52, 211, 153, 0.4) !important;
+}
+[data-theme="dark"] .step-badge-soup {
+  background-color: rgba(180, 83, 9, 0.2) !important;
+  color: #fbbf24 !important;
+  border-color: rgba(251, 191, 36, 0.4) !important;
+}
+[data-theme="dark"] .step-badge-child {
+  background-color: rgba(190, 24, 93, 0.2) !important;
+  color: #f472b6 !important;
+  border-color: rgba(244, 114, 182, 0.4) !important;
+}
+[data-theme="dark"] .step-badge-common {
+  background-color: rgba(67, 56, 202, 0.2) !important;
+  color: #a5b4fc !important;
+  border-color: rgba(165, 180, 252, 0.4) !important;
+}
