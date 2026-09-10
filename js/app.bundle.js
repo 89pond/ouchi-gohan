@@ -6,7 +6,8 @@ const STORAGE_KEYS = {
   INVENTORY: 'meal_app_inventory',
   DELICIOUS_RECIPES: 'meal_app_delicious_recipes',
   MEAL_LOGS: 'meal_app_logs',
-  API_KEY: 'meal_app_gemini_api_key'
+  API_KEY: 'meal_app_gemini_api_key',
+  CURRENT_RECIPE: 'meal_app_current_recipe'
 };
 
 const DEFAULT_SETTINGS = {
@@ -192,6 +193,24 @@ const Store = {
     }
   },
 
+  getCurrentRecipe() {
+    const raw = localStorage.getItem(STORAGE_KEYS.CURRENT_RECIPE);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  },
+
+  saveCurrentRecipe(recipe) {
+    if (!recipe) {
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_RECIPE);
+    } else {
+      localStorage.setItem(STORAGE_KEYS.CURRENT_RECIPE, JSON.stringify(recipe));
+    }
+  },
+
   isDeliciousRecipe(title) {
     if (!title) return false;
     const list = this.getDeliciousRecipes();
@@ -201,14 +220,14 @@ const Store = {
   isCourseFavorite(courseName) {
     if (!courseName) return false;
     const list = this.getDeliciousRecipes();
-    return list.some(r => (r.courseName === courseName || (r.courses && Object.values(r.courses).some(c => c?.name === courseName))));
+    return list.some(r => r.itemType === 'course' && (r.courseName === courseName || r.title === courseName));
   },
 
   saveCourseFavorite(courseKey, courseItem, parentRecipe) {
     if (!courseItem || !courseItem.name) return null;
     const list = this.getDeliciousRecipes();
     const courseName = courseItem.name;
-    const existingIndex = list.findIndex(r => r.courseName === courseName || (r.itemType === 'course' && r.title === courseName));
+    const existingIndex = list.findIndex(r => r.itemType === 'course' && (r.courseName === courseName || r.title === courseName));
     const existing = existingIndex >= 0 ? list[existingIndex] : null;
 
     // 単品料理用の保存オブジェクト
@@ -261,14 +280,15 @@ const Store = {
 
   removeCourseFavoriteByName(courseName) {
     if (!courseName) return;
-    const list = this.getDeliciousRecipes().filter(r => r.courseName !== courseName && !(r.itemType === 'course' && r.title === courseName));
+    const list = this.getDeliciousRecipes().filter(r => !(r.itemType === 'course' && (r.courseName === courseName || r.title === courseName)));
     localStorage.setItem(STORAGE_KEYS.DELICIOUS_RECIPES, JSON.stringify(list));
     window.dispatchEvent(new CustomEvent('app:delicious-updated', { detail: list }));
   },
 
   toggleCourseFavorite(courseKey, courseItem, parentRecipe) {
     if (!courseItem || !courseItem.name) return false;
-    if (this.isCourseFavorite(courseItem.name)) {
+    const isCurrentlyFav = this.isCourseFavorite(courseItem.name);
+    if (isCurrentlyFav) {
       this.removeCourseFavoriteByName(courseItem.name);
       return false; // 解除された
     } else {
@@ -1362,6 +1382,7 @@ const Recipe = {
   hallFilter: 'all', // 'all' | 'set' | 'main' | 'side' | 'soup' | 'staple'
 
   init() {
+    this.currentProposal = Store.getCurrentRecipe();
     this.bindEvents();
     this.render();
   },
@@ -1422,12 +1443,13 @@ const Recipe = {
       };
     }
 
-    // 献立画面での手順スタイル切り替え時に即時反映（既存の提案結果の表示方法のみを切り替え）
+    // 献立画面での手順スタイル切り替え時に即時反映
     const stepModeSelect = document.getElementById('recipe-step-mode-select');
     if (stepModeSelect) {
       stepModeSelect.addEventListener('change', () => {
         if (this.currentProposal) {
           this.currentProposal.stepMode = stepModeSelect.value;
+          Store.saveCurrentRecipe(this.currentProposal);
           this.render();
         }
       });
@@ -1453,6 +1475,7 @@ const Recipe = {
       const stepMode = document.getElementById('recipe-step-mode-select')?.value || Store.getSettings().cookingStepMode || 'combined';
       const servings = document.getElementById('recipe-servings-select')?.value || Store.getSettings().defaultServings || 3;
       this.currentProposal = await ApiClient.generateMealProposal(Store.getInventory(), Store.getSettings(), genre, stepMode, servings, mealTime);
+      Store.saveCurrentRecipe(this.currentProposal);
       this.render();
     } finally {
       if (spinner) spinner.classList.add('hidden');
@@ -1484,6 +1507,7 @@ const Recipe = {
     } else {
       this.currentProposal = item;
     }
+    Store.saveCurrentRecipe(this.currentProposal);
     // 献立タブに切り替えて詳細を表示
     document.getElementById('recipe-tab-suggest')?.click();
   },
@@ -1531,7 +1555,7 @@ const Recipe = {
 
       const filterTabs = [
         { id: 'all', label: 'すべて', count: allList.length },
-        { id: 'set', label: '🍱 献立セット', count: allList.filter(i => i.itemType !== 'course').length },
+        { id: 'set', label: '🍱 セット', count: allList.filter(i => i.itemType !== 'course').length },
         { id: 'main', label: '🥩 主菜', count: allList.filter(i => i.itemType === 'course' && i.courseKey === 'main').length },
         { id: 'side', label: '🥗 副菜', count: allList.filter(i => i.itemType === 'course' && i.courseKey === 'side').length },
         { id: 'soup', label: '🥣 汁物', count: allList.filter(i => i.itemType === 'course' && i.courseKey === 'soup').length }
@@ -1539,18 +1563,18 @@ const Recipe = {
 
       container.innerHTML = `
         <div class="space-y-3 animate-fade-in">
-          <!-- フィルタータブ (横スクロール対応) -->
-          <div class="flex items-center space-x-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+          <!-- フィルタータブ (5等分でスクロール不要・汁物まで1画面に収まる) -->
+          <div class="grid grid-cols-5 gap-1 text-[11px]">
             ${filterTabs.map(t => {
               const active = this.hallFilter === t.id;
               return `
-                <button type="button" data-hall-filter="${t.id}" class="shrink-0 px-2.5 py-1.5 rounded-xl font-bold transition-all ${
+                <button type="button" data-hall-filter="${t.id}" class="py-1.5 px-0.5 rounded-xl font-bold transition-all text-center flex flex-col items-center justify-center ${
                   active
-                    ? 'theme-primary-bg text-white shadow-2xs scale-100'
+                    ? 'theme-primary-bg text-white shadow-2xs'
                     : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
                 }">
-                  <span>${t.label}</span>
-                  <span class="ml-1 text-[10px] opacity-80">(${t.count})</span>
+                  <span class="truncate leading-none text-[11px]">${t.label}</span>
+                  <span class="text-[9px] opacity-80 mt-0.5 font-medium">${t.count}</span>
                 </button>
               `;
             }).join('')}
@@ -2071,6 +2095,7 @@ const Recipe = {
       p.title = `${selected.name} 定食`;
     }
 
+    Store.saveCurrentRecipe(p);
     this.render();
   }
 };
