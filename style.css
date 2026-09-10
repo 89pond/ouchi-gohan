@@ -57,6 +57,61 @@
   color: #f4f4f5 !important;
 }
 
+/* ================= 文字サイズ切替 (標準 / 読みやすい大 / 特大) ================= */
+html[data-font-size="large"] {
+  font-size: 110%;
+}
+html[data-font-size="xlarge"] {
+  font-size: 122%;
+}
+
+/* 大・特大選択時のレシピ手順と食材の視認性特化 */
+html[data-font-size="large"] .recipe-step-text,
+html[data-font-size="large"] .recipe-ingredient-item {
+  font-size: 1.05rem !important;
+  line-height: 1.6 !important;
+}
+html[data-font-size="xlarge"] .recipe-step-text,
+html[data-font-size="xlarge"] .recipe-ingredient-item {
+  font-size: 1.2rem !important;
+  line-height: 1.7 !important;
+  font-weight: 600 !important;
+}
+
+/* 調味料バッジのハイライト */
+.seasoning-inline-badge {
+  display: inline-block;
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.35rem;
+  font-weight: 700;
+  background-color: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  margin: 0 0.15rem;
+}
+[data-theme="dark"] .seasoning-inline-badge {
+  background-color: #451a03;
+  color: #fde68a;
+  border-color: #78350f;
+}
+
+/* 子どもの味付け＆仕上げバッジ */
+.child-seasoning-badge {
+  display: inline-block;
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.35rem;
+  font-weight: 700;
+  background-color: #fce7f3;
+  color: #9d174d;
+  border: 1px solid #fbcfe8;
+  margin: 0 0.15rem;
+}
+[data-theme="dark"] .child-seasoning-badge {
+  background-color: #500724;
+  color: #fbcfe8;
+  border-color: #831843;
+}
+
 /* メインラッパー & カード全般 */
 #app-wrapper {
   background-color: var(--card-bg);
@@ -467,32 +522,119 @@ body {
 
 /* ダークモードでのステップバッジ視認性強化 */
 [data-theme="dark"] .step-badge-staple {
-  background-color: rgba(194, 65, 12, 0.2) !important;
-  color: #fb923c !important;
-  border-color: rgba(251, 146, 60, 0.4) !important;
+  background-color: rgba(194, 65, 12, 0.35) !important;
+  color: #fdba74 !important;
+  border-color: rgba(251, 146, 60, 0.6) !important;
 }
 [data-theme="dark"] .step-badge-main {
-  background-color: rgba(190, 18, 60, 0.2) !important;
-  color: #fb7185 !important;
-  border-color: rgba(251, 113, 133, 0.4) !important;
+  background-color: rgba(190, 18, 60, 0.35) !important;
+  color: #fda4af !important;
+  border-color: rgba(251, 113, 133, 0.6) !important;
 }
 [data-theme="dark"] .step-badge-side {
-  background-color: rgba(4, 120, 87, 0.2) !important;
-  color: #34d399 !important;
-  border-color: rgba(52, 211, 153, 0.4) !important;
+  background-color: rgba(4, 120, 87, 0.35) !important;
+  color: #6ee7b7 !important;
+  border-color: rgba(52, 211, 153, 0.6) !important;
 }
 [data-theme="dark"] .step-badge-soup {
-  background-color: rgba(180, 83, 9, 0.2) !important;
-  color: #fbbf24 !important;
-  border-color: rgba(251, 191, 36, 0.4) !important;
+  background-color: rgba(180, 83, 9, 0.35) !important;
+  color: #fcd34d !important;
+  border-color: rgba(251, 191, 36, 0.6) !important;
 }
 [data-theme="dark"] .step-badge-child {
-  background-color: rgba(190, 24, 93, 0.2) !important;
-  color: #f472b6 !important;
-  border-color: rgba(244, 114, 182, 0.4) !important;
+  background-color: rgba(190, 24, 93, 0.45) !important;
+  color: #f9a8d4 !important;
+  border-color: rgba(244, 114, 182, 0.7) !important;
+  font-weight: 700 !important;
 }
 [data-theme="dark"] .step-badge-common {
-  background-color: rgba(67, 56, 202, 0.2) !important;
-  color: #a5b4fc !important;
-  border-color: rgba(165, 180, 252, 0.4) !important;
+  background-color: rgba(67, 56, 202, 0.35) !important;
+  color: #c7d2fe !important;
+  border-color: rgba(165, 180, 252, 0.6) !important;
 }
+
+/* ダークモードでの調味料バッジ & 子ども用味付けインラインバッジの視認性確保 */
+[data-theme="dark"] .seasoning-inline-badge {
+  background-color: rgba(30, 41, 59, 0.95) !important;
+  color: #fde047 !important;
+  border-color: rgba(234, 179, 8, 0.6) !important;
+}
+[data-theme="dark"] .child-seasoning-badge {
+  background-color: rgba(80, 7, 36, 0.95) !important;
+  color: #fbcfe8 !important;
+  border-color: rgba(244, 114, 182, 0.7) !important;
+}
+
+/* ダークモードでの献立カード・品目カード（bg-*-50/40）の白浮き防止と文字高コントラスト */
+[data-theme="dark"] .bg-rose-50\/40,
+[data-theme="dark"] [class*="bg-rose-50"] {
+  background-color: #241419 !important;
+  border-color: #4c1d2c !important;
+  color: #f4f4f5 !important;
+}
+[data-theme="dark"] .bg-emerald-50\/40,
+[data-theme="dark"] [class*="bg-emerald-50"] {
+  background-color: #12231c !important;
+  border-color: #164e3b !important;
+  color: #f4f4f5 !important;
+}
+[data-theme="dark"] .bg-amber-50\/40,
+[data-theme="dark"] [class*="bg-amber-50"] {
+  background-color: #261e12 !important;
+  border-color: #593b13 !important;
+  color: #f4f4f5 !important;
+}
+[data-theme="dark"] .bg-orange-50\/40,
+[data-theme="dark"] [class*="bg-orange-50"] {
+  background-color: #261a12 !important;
+  border-color: #5c2f16 !important;
+  color: #f4f4f5 !important;
+}
+
+/* レシピ手順テキストおよびリストのダークモード文字色 */
+[data-theme="dark"] .recipe-step-text,
+[data-theme="dark"] .recipe-step-text * {
+  color: #ffffff !important;
+}
+[data-theme="dark"] .recipe-step-text .child-seasoning-badge,
+[data-theme="dark"] .recipe-step-text .child-seasoning-badge * {
+  color: #fbcfe8 !important;
+}
+[data-theme="dark"] .recipe-step-text .seasoning-inline-badge,
+[data-theme="dark"] .recipe-step-text .seasoning-inline-badge * {
+  color: #fde047 !important;
+}
+[data-theme="dark"] .recipe-step-text .step-badge,
+[data-theme="dark"] .recipe-step-text .step-badge * {
+  /* 各step-badge専用カラーを保持 */
+}
+
+/* ================= トースト通知 (保存時の控えめなポップアップ) ================= */
+#app-toast {
+  position: fixed;
+  top: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  z-index: 9999;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+#app-toast.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* 品目カード内のお気に入りトグルボタン */
+.course-fav-btn {
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+.course-fav-btn:active {
+  transform: scale(0.85);
+}
+.course-fav-btn.is-active {
+  color: #f59e0b !important;
+  text-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+}
+
