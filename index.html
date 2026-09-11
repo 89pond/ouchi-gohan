@@ -704,48 +704,26 @@
 
     <!-- 4. 食材一括修正モーダル -->
     <div id="bulk-edit-modal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl animate-fade-in space-y-3">
-        <div class="flex items-center justify-between pb-2 border-b border-gray-100">
+      <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl animate-fade-in space-y-3 flex flex-col max-h-[85vh]">
+        <div class="flex items-center justify-between pb-2 border-b border-gray-100 shrink-0">
           <div>
             <h3 class="font-bold text-gray-800 text-base">✏️ 食材をまとめて修正</h3>
             <p id="bulk-edit-target-label" class="text-xs text-orange-600 font-bold">選択中: 0品</p>
           </div>
-          <button id="bulk-edit-cancel-btn" class="text-gray-400 p-1 text-lg">&times;</button>
+          <button id="bulk-edit-cancel-btn" class="text-gray-400 hover:text-gray-600 p-1 text-xl font-bold">&times;</button>
         </div>
-        <div class="space-y-3 text-xs">
-          <!-- 期限一括操作 -->
-          <div class="p-3 bg-orange-50/60 rounded-xl border border-orange-100 space-y-2">
-            <span class="font-black text-gray-700 block">⏰ 消費期限の一括変更</span>
-            <div class="flex items-center space-x-2">
-              <button type="button" data-bulk-add-days="1" class="flex-1 py-1.5 bg-white border border-orange-200 rounded-lg font-bold text-orange-700 hover:bg-orange-100 active:scale-95 shadow-2xs">＋1日</button>
-              <button type="button" data-bulk-add-days="2" class="flex-1 py-1.5 bg-white border border-orange-200 rounded-lg font-bold text-orange-700 hover:bg-orange-100 active:scale-95 shadow-2xs">＋2日</button>
-              <button type="button" data-bulk-add-days="3" class="flex-1 py-1.5 bg-white border border-orange-200 rounded-lg font-bold text-orange-700 hover:bg-orange-100 active:scale-95 shadow-2xs">＋3日</button>
-              <button type="button" data-bulk-add-days="7" class="flex-1 py-1.5 bg-white border border-orange-200 rounded-lg font-bold text-orange-700 hover:bg-orange-100 active:scale-95 shadow-2xs">＋7日</button>
-            </div>
-            <div class="flex items-center space-x-2 pt-1">
-              <span class="text-gray-500 font-bold shrink-0">指定日数に統一:</span>
-              <input type="number" id="bulk-set-days-input" min="0" max="60" placeholder="例: 5" class="w-16 p-1.5 bg-white border border-gray-200 rounded-lg text-center font-bold">
-              <span class="text-gray-500 shrink-0">日にする</span>
-              <button type="button" id="btn-bulk-apply-days" class="px-3 py-1.5 bg-orange-500 text-white font-bold rounded-lg active:scale-95">設定</button>
-            </div>
-          </div>
+        
+        <p class="text-[11px] text-gray-500 shrink-0">各食材の名前、数量、賞味日数、カテゴリをその場で直接修正できます。</p>
+        
+        <!-- 食材一覧（レシート確認画面スタイルでインライン手修正可能） -->
+        <div id="bulk-edit-items-list" class="flex-1 overflow-y-auto py-1 space-y-2.5 pr-1">
+          <!-- JSで動的生成 -->
+        </div>
 
-          <!-- カテゴリ一括変更 -->
-          <div class="p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-2">
-            <span class="font-black text-gray-700 block">🏷️ カテゴリの一括変更</span>
-            <div class="flex items-center space-x-2">
-              <select id="bulk-cat-select" class="flex-1 p-2 bg-white border border-gray-200 rounded-lg font-bold text-gray-700">
-                <option value="" selected>変更しない (そのまま)</option>
-                <option value="野菜">野菜</option>
-                <option value="肉類">肉類</option>
-                <option value="魚介">魚介</option>
-                <option value="卵・大豆">卵・大豆</option>
-                <option value="乳製品">乳製品</option>
-                <option value="その他">その他</option>
-              </select>
-              <button type="button" id="btn-bulk-apply-cat" class="px-3 py-2 bg-gray-800 text-white font-bold rounded-lg active:scale-95">変更</button>
-            </div>
-          </div>
+        <div class="pt-2 border-t border-gray-100 shrink-0">
+          <button id="bulk-edit-save-all-btn" class="w-full py-3 rounded-xl text-white font-bold text-xs theme-primary-bg shadow-sm active:scale-95 transition-all flex items-center justify-center space-x-1.5">
+            <span>💾 変更を一括保存する</span>
+          </button>
         </div>
       </div>
     </div>
@@ -767,6 +745,6 @@
   </div>
 
   <!-- JavaScript統合バンドル（CORS制限のない完全ローカル対応） -->
-  <script src="js/app.bundle.js?v=20260911_2235"></script>
+  <script src="js/app.bundle.js?v=20260911_2255"></script>
 </body>
 </html>

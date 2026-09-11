@@ -2396,20 +2396,13 @@ const Inventory = {
           ${items.map(item => {
             const isSelected = this.selectedIds.has(item.id);
             return `
-              <div data-inv-card="${item.id}" class="rounded-2xl p-3 border transition-all flex items-center justify-between text-xs cursor-pointer select-none ${
+              <div data-inv-card="${item.id}" class="p-3.5 rounded-2xl cursor-pointer transition-all flex items-center justify-between ${
                 isSelected
-                  ? 'border-2 border-orange-500 bg-orange-50/60 shadow-sm'
-                  : 'bg-white border-gray-100 hover:border-gray-200 shadow-2xs'
+                  ? 'border-2 border-orange-500 bg-orange-50/70 shadow-sm'
+                  : 'border border-gray-100 bg-white hover:border-gray-200 shadow-2xs'
               }">
-                <!-- 左側: トグル選択丸バッジ ＆ 食材情報 -->
-                <div class="flex items-center space-x-3 flex-1 min-w-0">
-                  <div class="w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-all ${
-                    isSelected
-                      ? 'bg-orange-500 text-white text-[11px] font-black'
-                      : 'border-2 border-gray-300 bg-white'
-                  }">
-                    ${isSelected ? '✓' : ''}
-                  </div>
+                <!-- 左側: 食材情報 (選択時はカード全体がオレンジ枠線・ハイライト背景) -->
+                <div class="flex items-center space-x-2.5 flex-1 min-w-0">
                   <div class="flex-1 min-w-0">
                     <div class="font-black text-gray-800 text-xs truncate flex items-center space-x-1.5">
                       <span class="truncate">${item.name}</span>
@@ -2453,7 +2446,7 @@ const Inventory = {
       };
     }
 
-    // カードタップによるトグル選択 (ON/OFF)
+    // カードタップによるトグル選択 (ON/OFF: 色で状態を表現)
     container.querySelectorAll('[data-inv-card]').forEach(card => {
       card.onclick = () => {
         const id = card.dataset.invCard;
@@ -2540,20 +2533,69 @@ const Inventory = {
       };
     }
 
-    // 一括修正モーダルのバインド
+    // まとめて修正モーダルのバインド (レシート確認画面スタイルの全項目手修正)
     const openBulkEditBtn = document.getElementById('btn-open-bulk-edit');
     const bulkModal = document.getElementById('bulk-edit-modal');
     const bulkCancelBtn = document.getElementById('bulk-edit-cancel-btn');
     const bulkTargetLabel = document.getElementById('bulk-edit-target-label');
+    const bulkItemsList = document.getElementById('bulk-edit-items-list');
+    const bulkSaveAllBtn = document.getElementById('bulk-edit-save-all-btn');
 
-    if (openBulkEditBtn && bulkModal) {
+    const categories = ['野菜', '肉類', '魚介', '卵・大豆', '乳製品', 'その他'];
+
+    if (openBulkEditBtn && bulkModal && bulkItemsList) {
       openBulkEditBtn.onclick = () => {
         const count = this.selectedIds.size;
         if (count === 0) return;
         const selectedItems = items.filter(i => this.selectedIds.has(i.id));
         if (bulkTargetLabel) {
-          bulkTargetLabel.textContent = `選択中: ${count}品 (${selectedItems.map(i => i.name).join('、')})`;
+          bulkTargetLabel.textContent = `選択中: ${count}品`;
         }
+
+        // レシート確認画面と同じ編集カードを動的生成
+        bulkItemsList.innerHTML = selectedItems.map(item => `
+          <div class="p-3 bg-gray-50/95 rounded-2xl border border-gray-200 space-y-2 text-xs" data-bulk-edit-row="${item.id}">
+            <div class="flex items-center space-x-2">
+              <span class="text-xs font-bold text-gray-400 shrink-0">名称:</span>
+              <input type="text" data-bulk-name="${item.id}" value="${item.name || ''}" placeholder="食材名" class="flex-1 font-black text-gray-800 bg-white border border-gray-200 px-2 py-1 rounded-xl text-xs focus:outline-none focus:border-orange-500">
+              <button type="button" data-bulk-remove-row="${item.id}" class="text-gray-400 hover:text-rose-500 p-1 text-sm shrink-0" title="まとめて修正から除外">🗑️</button>
+            </div>
+            <div class="grid grid-cols-3 gap-1.5 pt-0.5">
+              <div>
+                <label class="block text-[9px] font-bold text-gray-400 mb-0.5">数量・単位</label>
+                <input type="text" data-bulk-qty="${item.id}" value="${item.quantity || '1個'}" class="w-full bg-white border border-gray-200 px-2 py-1 rounded-lg text-xs font-bold text-gray-700">
+              </div>
+              <div>
+                <label class="block text-[9px] font-bold text-gray-400 mb-0.5">期限 (あと何日)</label>
+                <div class="flex items-center space-x-1">
+                  <input type="number" data-bulk-exp="${item.id}" value="${item.expiryDays ?? 3}" min="0" max="60" class="w-full bg-white border border-gray-200 px-1.5 py-1 rounded-lg text-xs font-bold text-gray-700">
+                  <span class="text-[10px] text-gray-400 shrink-0">日</span>
+                </div>
+              </div>
+              <div>
+                <label class="block text-[9px] font-bold text-gray-400 mb-0.5">カテゴリ</label>
+                <select data-bulk-cat="${item.id}" class="w-full bg-white border border-gray-200 px-1 py-1 rounded-lg text-xs font-bold text-gray-700">
+                  ${categories.map(cat => `<option value="${cat}" ${item.category === cat ? 'selected' : ''}>${cat}</option>`).join('')}
+                </select>
+              </div>
+            </div>
+          </div>
+        `).join('');
+
+        // 修正対象から除外するボタン
+        bulkItemsList.querySelectorAll('[data-bulk-remove-row]').forEach(rmBtn => {
+          rmBtn.onclick = () => {
+            const rowId = rmBtn.dataset.bulkRemoveRow;
+            const rowEl = bulkItemsList.querySelector(`[data-bulk-edit-row="${rowId}"]`);
+            if (rowEl) rowEl.remove();
+            const remaining = bulkItemsList.querySelectorAll('[data-bulk-edit-row]').length;
+            if (bulkTargetLabel) bulkTargetLabel.textContent = `選択中: ${remaining}品`;
+            if (remaining === 0) {
+              bulkModal.classList.add('hidden');
+            }
+          };
+        });
+
         bulkModal.classList.remove('hidden');
       };
     }
@@ -2562,61 +2604,36 @@ const Inventory = {
       bulkCancelBtn.onclick = () => bulkModal.classList.add('hidden');
     }
 
-    // 一括延長ボタン群 (+1, +2, +3, +7日)
-    document.querySelectorAll('[data-bulk-add-days]').forEach(btn => {
-      btn.onclick = () => {
-        const addDays = parseInt(btn.dataset.bulkAddDays, 10);
-        const count = this.selectedIds.size;
-        this.selectedIds.forEach(id => {
-          const it = items.find(i => i.id === id);
-          if (it) {
-            Store.updateInventoryItem(id, { expiryDays: (it.expiryDays || 0) + addDays });
-          }
-        });
-        if (window.showToast) window.showToast(`${count}品の期限を+${addDays}日延長しました`, '⏰');
-        bulkModal?.classList.add('hidden');
-        this.selectedIds.clear();
-        this.render();
-      };
-    });
-
-    // 日数統一設定ボタン
-    const applyDaysBtn = document.getElementById('btn-bulk-apply-days');
-    const setDaysInput = document.getElementById('bulk-set-days-input');
-    if (applyDaysBtn && setDaysInput) {
-      applyDaysBtn.onclick = () => {
-        const days = parseInt(setDaysInput.value, 10);
-        if (isNaN(days) || days < 0) {
-          alert('有効な日数を入力してください');
+    // 「変更を一括保存する」ボタン
+    if (bulkSaveAllBtn && bulkModal && bulkItemsList) {
+      bulkSaveAllBtn.onclick = () => {
+        const rows = bulkItemsList.querySelectorAll('[data-bulk-edit-row]');
+        if (rows.length === 0) {
+          bulkModal.classList.add('hidden');
           return;
         }
-        const count = this.selectedIds.size;
-        this.selectedIds.forEach(id => {
-          Store.updateInventoryItem(id, { expiryDays: days });
-        });
-        if (window.showToast) window.showToast(`${count}品の期限を「あと${days}日」に統一しました`, '⏰');
-        bulkModal?.classList.add('hidden');
-        this.selectedIds.clear();
-        this.render();
-      };
-    }
 
-    // カテゴリ一括変更ボタン
-    const applyCatBtn = document.getElementById('btn-bulk-apply-cat');
-    const catSelect = document.getElementById('bulk-cat-select');
-    if (applyCatBtn && catSelect) {
-      applyCatBtn.onclick = () => {
-        const cat = catSelect.value;
-        if (!cat) {
-          alert('変更先のカテゴリを選択してください');
-          return;
-        }
-        const count = this.selectedIds.size;
-        this.selectedIds.forEach(id => {
-          Store.updateInventoryItem(id, { category: cat });
+        let savedCount = 0;
+        rows.forEach(row => {
+          const id = row.dataset.bulkEditRow;
+          const nameInput = row.querySelector(`[data-bulk-name="${id}"]`);
+          const qtyInput = row.querySelector(`[data-bulk-qty="${id}"]`);
+          const expInput = row.querySelector(`[data-bulk-exp="${id}"]`);
+          const catSelect = row.querySelector(`[data-bulk-cat="${id}"]`);
+
+          const name = nameInput?.value?.trim();
+          if (!name) return; // 空白名はスキップ
+
+          const quantity = qtyInput?.value?.trim() || '1個';
+          const expiryDays = Math.max(0, parseInt(expInput?.value || '0', 10));
+          const category = catSelect?.value || 'その他';
+
+          Store.updateInventoryItem(id, { name, quantity, expiryDays, category });
+          savedCount++;
         });
-        if (window.showToast) window.showToast(`${count}品のカテゴリを「${cat}」に変更しました`, '🏷️');
-        bulkModal?.classList.add('hidden');
+
+        if (window.showToast) window.showToast(`${savedCount}品の食材を一括修正しました`, '✏️');
+        bulkModal.classList.add('hidden');
         this.selectedIds.clear();
         this.render();
       };
