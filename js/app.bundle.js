@@ -610,6 +610,23 @@ const ApiClient = {
       dinner: '【夕食向け】1日の栄養バランスを整える、家族全員で囲む満足感の高いディナー。'
     };
 
+    const adultGoalDescriptions = {
+      general: '一般・健康バランス（栄養バランス重視・主食主菜副菜汁物の調和）',
+      athlete: 'アスリート（高タンパク質・疲労回復・筋肉補修・ミネラル強化）',
+      diet: 'ダイエット（糖質・脂質ひかえめ・食物繊維・満足感重視・ベジファースト）',
+      health: '健康管理・生活習慣病対策（減塩・出汁活用・血糖値スパイク抑制）'
+    };
+
+    const stageDescriptions = {
+      milk: '授乳・ミルク期（離乳食前・取り分け不要）',
+      early: '離乳食初期（5〜6ヶ月頃・ごっくん期・滑らかなペースト）',
+      mid: '離乳食中期（7〜8ヶ月頃・もぐもぐ期・舌でつぶせる固さ）',
+      late: '離乳食後期（9〜11ヶ月頃・かみかみ期・歯ぐきでつぶせる固さ）',
+      complete: '離乳食完了期（12〜18ヶ月頃・ぱくぱく期・歯ぐきで噛める固さ）',
+      toddler: '幼児食（1歳半〜5歳頃・薄味・大人に近い一口サイズ）',
+      child: '学童・成長期（しっかり栄養・大人と同じ）'
+    };
+
     const courseNameMap = { main: '主菜(メインおかず)', side: '副菜(野菜小鉢)', soup: '汁物(味噌汁・スープ)', staple: '主食(ご飯・麺・パン)' };
     const targetCourseNames = selectedCourses.map(k => courseNameMap[k] || k).join('、');
 
@@ -692,7 +709,8 @@ ${(settings.children || []).map(c => `- ${c.name}: ${c.birthDate}生 (${stageDes
       const data = await res.json();
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
       const cleanJson = text.replace(/```json\n?|\n?```/g, '').trim();
-      return JSON.parse(cleanJson);
+      const parsed = JSON.parse(cleanJson);
+      return this.filterProposalBySelectedCourses(parsed, selectedCourses, stapleVariant);
     } catch (err) {
       console.warn('Real Gemini API meal proposal failed, fallback to mock:', err);
       return this.mockMealProposal(inventory, settings, genre, stepMode, servings, actualMealTime, selectedCourses, stapleVariant);
@@ -1642,6 +1660,29 @@ const Recipe = {
       );
       Store.saveCurrentRecipe(this.currentProposal);
       this.render();
+    } catch (err) {
+      console.error('献立提案の生成に失敗しました:', err);
+      try {
+        const mealTime = document.getElementById('recipe-meal-time-select')?.value || 'auto';
+        const genre = document.getElementById('recipe-genre-select')?.value || 'auto';
+        const stepMode = document.getElementById('recipe-step-mode-select')?.value || Store.getSettings().cookingStepMode || 'combined';
+        const servings = document.getElementById('recipe-servings-select')?.value || Store.getSettings().defaultServings || 3;
+        this.currentProposal = ApiClient.mockMealProposal(
+          Store.getInventory(),
+          Store.getSettings(),
+          genre,
+          stepMode,
+          servings,
+          mealTime,
+          this.selectedCourses,
+          this.stapleVariant
+        );
+        Store.saveCurrentRecipe(this.currentProposal);
+        this.render();
+        if (window.showToast) window.showToast('オフライン提案を表示しました', '💡');
+      } catch (fallbackErr) {
+        console.error('フォールバック生成にも失敗しました:', fallbackErr);
+      }
     } finally {
       if (spinner) spinner.classList.add('hidden');
     }
