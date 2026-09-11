@@ -638,3 +638,33 @@ body {
   text-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
 }
 
+/* ================= 提案品目選択カード (複数選択トグル) ================= */
+.course-select-card {
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+  user-select: none;
+}
+.course-select-card:active {
+  transform: scale(0.96);
+}
+.course-select-card.is-selected {
+  border-color: var(--primary-color, #ea580c) !important;
+  background-color: #fff7ed !important;
+  box-shadow: 0 2px 8px -2px rgba(234, 88, 12, 0.2);
+}
+[data-theme="dark"] .course-select-card.is-selected {
+  background-color: #2a150c !important;
+  border-color: #ea580c !important;
+}
+.course-select-card .check-indicator {
+  transition: all 0.2s ease;
+  opacity: 0;
+  transform: scale(0.5);
+}
+.course-select-card.is-selected .check-indicator {
+  opacity: 1;
+  transform: scale(1);
+}
+
+

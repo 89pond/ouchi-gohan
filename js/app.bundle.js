@@ -591,9 +591,9 @@ const ApiClient = {
     }
   },
 
-  async generateMealProposal(inventory, settings, genre = 'auto', stepMode = 'combined', servings = 3, mealTime = 'auto') {
+  async generateMealProposal(inventory, settings, genre = 'auto', stepMode = 'combined', servings = 3, mealTime = 'auto', selectedCourses = ['main', 'side', 'soup', 'staple'], stapleVariant = 'auto') {
     const key = Store.getApiKey();
-    if (!key) return this.mockMealProposal(inventory, settings, genre, stepMode, servings, mealTime);
+    if (!key) return this.mockMealProposal(inventory, settings, genre, stepMode, servings, mealTime, selectedCourses, stapleVariant);
 
     // 時間帯の自動判定 (04:00-10:59: 朝食, 11:00-14:59: 昼食, その他: 夕食)
     let actualMealTime = mealTime;
@@ -607,27 +607,29 @@ const ApiClient = {
     const mealTimeInstructions = {
       breakfast: '【朝食向け】忙しい朝でも5〜10分で手軽に作れる時短・消化の良い軽食メニュー（トースト/卵料理/納豆ごはん/具だくさんスープ等）。加熱時間は極力短く設定してください。',
       lunch: '【昼食向け】10〜15分でサクッと食べられるワンプレート、麺類（うどん・パスタ等）、丼もの、チャーハンなどの軽快なランチメニュー。',
-      dinner: '【夕食向け】一汁三菜（主食・主菜・副菜・汁物）で1日の栄養バランスを整える、家族全員で囲む満足感の高いディナーセット。'
+      dinner: '【夕食向け】1日の栄養バランスを整える、家族全員で囲む満足感の高いディナー。'
     };
 
-    const stageDescriptions = {
-      milk: '授乳期 (離乳前)',
-      early: '離乳食初期 (5〜6ヶ月: トロトロのペースト・すりつぶし)',
-      mid: '離乳食中期 (7〜8ヶ月: 舌でつぶせる豆腐くらいの固さ・細かく刻む)',
-      late: '離乳食後期 (9〜11ヶ月: 歯ぐきでつぶせるバナナの固さ・手づかみ食べ)',
-      complete: '離乳食完了期 (12〜18ヶ月: 肉団子の固さ・薄味)',
-      toddler: '幼児食 (1歳半〜5歳: 大人より薄味、喉詰まり防止)'
-    };
+    const courseNameMap = { main: '主菜(メインおかず)', side: '副菜(野菜小鉢)', soup: '汁物(味噌汁・スープ)', staple: '主食(ご飯・麺・パン)' };
+    const targetCourseNames = selectedCourses.map(k => courseNameMap[k] || k).join('、');
 
-    const adultGoalDescriptions = {
-      general: '一般・バランス重視（野菜と主菜の調和）',
-      athlete: 'アスリート（高タンパク質重視、筋力維持・増量）',
-      diet: 'ダイエット（低糖質・低脂質、食物繊維豊富）',
-      health: '健康管理（減塩・血糖値上昇を抑えるベジファースト）'
-    };
+    let stapleInstruction = '';
+    if (selectedCourses.includes('staple')) {
+      if (stapleVariant === 'bread') stapleInstruction = '主食は「パン・トースト・バゲット」に合うものにしてください。';
+      else if (stapleVariant === 'noodles') stapleInstruction = '主食は「うどん・パスタ・そば等の麺類」にしてください。';
+      else if (stapleVariant === 'rice') stapleInstruction = '主食は「白ごはん・炊き込みご飯等の米飯」にしてください。';
+    } else {
+      stapleInstruction = '【重要】主食は作らない設定のため、主食(staple)は提案せず、指定されたおかずのみに集中した手順と材料を出力してください。';
+    }
 
     const prompt = `あなたは「一度の調理で家族全員分を作る」時短と安全を極めたプロの管理栄養士・AIシェフです。
-手持ちの食材在庫をベースに、大人の健康目的と子どもの月齢に合わせた「取り分け献立セット（主食・主菜・副菜・汁物）」を1セット提案してください。
+手持ちの食材在庫をベースに、大人の健康目的と子どもの月齢に合わせた献立レシピを1セット提案してください。
+
+【★最重要・提案対象の品目】
+今回は以下の品目のみを提案してください: 【 ${targetCourseNames} 】
+※指定されていない品目は "courses" オブジェクトに含めないでください。
+${stapleInstruction}
+
 作成人数目安: 約${servings}人前
 食事タイミング指示: ${mealTimeInstructions[actualMealTime] || mealTimeInstructions.dinner}
 
@@ -641,64 +643,40 @@ ${(settings.adultGoals || ['general']).map(g => adultGoalDescriptions[g] || g).j
 ${(settings.children || []).map(c => `- ${c.name}: ${c.birthDate}生 (${stageDescriptions[c.stage] || '幼児食'}), NG/アレルギー: ${c.ngFoods || 'なし'}`).join('\n')}
 
 【★最重要の必須調理ルール】
-1. 【調味料のインライン記載】: 各調理ステップの文章の中に、使う調味料と分量を必ず「【調味料: 醤油 大さじ1、みりん 小さじ2】」の形式で埋め込むこと。調理者が上部の材料表を見返さずにステップを読むだけで計量できるようにしてください。
-2. 【手順の具体性】: 火加減（強火・中火・弱火）、加熱時間の目安（約○分）、具材の状態の変化（しんなりするまで、焼き色がつくまで、透き通るまで等）を丁寧に明記すること。
-3. 【子ども用の味付け＆仕上げ手順の完全明記】: 「味付け前に取り分ける」だけで終わらせず、取り分けた後の子ども用おかず・ご飯の「具体的な味付け（出汁の量、薄口醤油の滴数、水分の調整）」と「仕上げ加熱（レンジ加熱○秒、小鍋でひと煮立ちなど）」まで手順に必ず記載し、子どもの料理も完全に仕上がるようにすること。
-4. 【安全ガードレール】: 1歳未満がいる場合ハチミツ・黒糖は絶対禁止。幼児食・離乳食はミニトマト四分割カットや食材の誤飲防止サイズを明記。
+1. 【調味料のインライン記載】: 各調理ステップの文章の中に、使う調味料と分量を必ず「【調味料: 醤油 大さじ1、みりん 小さじ2】」の形式で埋め込むこと。
+2. 【手順の具体性】: 火加減（強火・中火・弱火）、加熱時間の目安（約○分）、具材の状態の変化を丁寧に明記すること。
+3. 【子ども用の味付け＆仕上げ手順の完全明記】: 味付け前の取り分けだけでなく、取り分けた後の具体的な味付け（出汁大さじ1等）と加熱仕上げまで明記すること。
+4. 【安全ガードレール】: 1歳未満へのハチミツ・黒糖は絶対禁止。
 
 以下の純粋なJSONフォーマットのみを出力してください（Markdown装飾なし）:
 {
-  "title": "献立セットのタイトル（例: 豚バラとキャベツの重ね蒸し定食）",
+  "title": "献立のタイトル（例: 豚バラとキャベツの重ね蒸し）",
   "genre": "${genre}",
   "servings": ${servings},
   "courses": {
-    "staple": {"type": "主食", "name": "ごはん", "note": "普通盛り"},
-    "main": {"type": "主菜", "name": "豚バラとキャベツの重ね蒸し", "note": "素材の旨味"},
-    "side": {"type": "副菜", "name": "にんじんと玉ねぎの和え物", "note": "さっぱり"},
-    "soup": {"type": "汁物", "name": "豆腐とわかめのお味噌汁", "note": "出汁の香り"}
+    ${selectedCourses.map(k => `"${k}": {"type": "${k === 'main' ? '主菜' : k === 'side' ? '副菜' : k === 'soup' ? '汁物' : '主食'}", "name": "料理名", "note": "特徴"}`).join(',\n    ')}
   },
   "ingredientsWithAmounts": [
-    {"name": "豚バラ肉", "amount": "200g"},
-    {"name": "キャベツ", "amount": "1/4個"}
+    {"name": "食材名", "amount": "分量"}
   ],
   "seasonings": [
-    {"name": "和風出汁", "amount": "小さじ1"},
-    {"name": "醤油", "amount": "大さじ1.5"}
+    {"name": "調味料名", "amount": "分量"}
   ],
   "baseSteps": [
-    "【共通・下ごしらえ】キャベツはざく切り、豚肉は一口大に切る。にんじんは千切りにする。",
-    "【主菜・同時加熱】フライパンにキャベツと豚肉を敷き詰め、【調味料: 酒 大さじ1、和風出汁 小さじ1/2】を回しかけて蓋をし、中火で湯気が出るまで約5分蒸し焼きにする。",
-    "👶【子ども用取り分け＆味付け】大人の味付け前に、柔らかく蒸された豚肉とキャベツを取り出しキッチンバサミで1cmにカット。耐熱容器に入れ【子ども用味付け: 出汁 大さじ1、水 大さじ1】を加えてラップをし、電子レンジ600Wで20秒温めて薄味の出汁蒸しに仕上げる。",
-    "【主菜・仕上げ】フライパンの大人用に【調味料: ポン酢 大さじ2、黒胡椒 少々】を回しかけ、中火で全体にさっと絡めて完成！"
+    "【調理ステップ】...【調味料: ...】...",
+    "👶【子ども用取り分け＆味付け】..."
   ],
   "courseSteps": {
-    "main": [
-      "キャベツをざく切り、豚肉を一口大に切る。",
-      "フライパンに敷き、【調味料: 酒 大さじ1】を振り中火で約5分蒸し焼きにする。",
-      "👶【子ども用取り分け＆味付け】味付け前に柔らかい具材を取り分け、耐熱容器で【子ども用味付け: 出汁 大さじ1】を加えてレンジ20秒加熱し仕上げる。",
-      "大人用に【調味料: ポン酢 大さじ2】を回し入れ、中火で1分絡めて仕上げる。"
-    ],
-    "side": [
-      "にんじんと玉ねぎを薄切りにし、耐熱皿でラップをしレンジ600Wで1分30秒加熱。",
-      "【調味料: 酢 小さじ1、ごま油 小さじ1/2、塩 少々】を和えて副菜完成。"
-    ],
-    "soup": [
-      "小鍋に水400mlと【調味料: 和風出汁 小さじ1】を入れて煮立て、さいの目切り豆腐を加える。",
-      "👶【子ども用取り分け】お椀に取り分け、白湯大さじ1で薄めて子ども用にする。",
-      "大人用鍋の火を止め、【調味料: 味噌 大さじ1】を溶き入れて完成。"
-    ],
-    "staple": [
-      "ごはんを各お茶碗によそう。子ども用は軟飯または少量盛りに調整。"
-    ]
+    ${selectedCourses.map(k => `"${k}": ["ステップ1", "ステップ2"]`).join(',\n    ')}
   },
   "stepMode": "${stepMode}",
   "childSeparations": [
-    "味付け前に豚肉とキャベツを取り出し、出汁大さじ1を加えてレンジ20秒加熱し薄味仕立てにする。"
+    "取り分けアドバイス"
   ],
   "adultArrangements": [
-    "血糖値上昇を抑えるため蒸しキャベツから先に食べるベジファーストを推奨。"
+    "大人アレンジ"
   ],
-  "safetyAlert": "1歳未満へのハチミツ厳禁。お肉は噛み切りやすいよう必ず細かく刻んでください。"
+  "safetyAlert": "安全メモ"
 }`;
 
     try {
@@ -717,7 +695,7 @@ ${(settings.children || []).map(c => `- ${c.name}: ${c.birthDate}生 (${stageDes
       return JSON.parse(cleanJson);
     } catch (err) {
       console.warn('Real Gemini API meal proposal failed, fallback to mock:', err);
-      return this.mockMealProposal(inventory, settings, genre, stepMode, servings);
+      return this.mockMealProposal(inventory, settings, genre, stepMode, servings, actualMealTime, selectedCourses, stapleVariant);
     }
   },
 
@@ -761,6 +739,68 @@ ${(settings.children || []).map(c => `- ${c.name}: ${c.birthDate}生 (${stageDes
     }
   },
 
+  filterProposalBySelectedCourses(proposal, selectedCourses = ['main', 'side', 'soup', 'staple'], stapleVariant = 'auto') {
+    if (!proposal || !proposal.courses) return proposal;
+
+    // 1. 指定された品目のみを抽出
+    const filteredCourses = {};
+    selectedCourses.forEach(key => {
+      if (proposal.courses[key]) {
+        filteredCourses[key] = proposal.courses[key];
+      }
+    });
+
+    // 安全ガード（もし空なら主菜をデフォルト）
+    if (Object.keys(filteredCourses).length === 0 && proposal.courses.main) {
+      filteredCourses.main = proposal.courses.main;
+    }
+
+    // 2. 主食のバリエーション指定の適用
+    if (filteredCourses.staple && stapleVariant && stapleVariant !== 'auto') {
+      if (stapleVariant === 'bread') {
+        filteredCourses.staple = { type: '主食', name: 'カリッと焼いたトースト または バゲット', note: '香ばしいパン' };
+      } else if (stapleVariant === 'noodles') {
+        filteredCourses.staple = { type: '主食', name: '温かい素うどん または パスタ', note: 'つるっと食べやすい' };
+      } else if (stapleVariant === 'rice') {
+        filteredCourses.staple = { type: '主食', name: 'ほかほか白ごはん', note: '炊きたて普通盛り' };
+      }
+    }
+    proposal.courses = filteredCourses;
+
+    // 3. 手順 courseSteps の絞り込み
+    if (proposal.courseSteps) {
+      const filteredSteps = {};
+      selectedCourses.forEach(key => {
+        if (proposal.courseSteps[key]) {
+          filteredSteps[key] = proposal.courseSteps[key];
+        }
+      });
+      proposal.courseSteps = filteredSteps;
+    }
+
+    // 4. タイトルと所要時間のスマート化
+    const courseKeys = Object.keys(filteredCourses);
+    if (courseKeys.length === 1) {
+      const single = filteredCourses[courseKeys[0]];
+      proposal.mealTitle = single.name;
+      proposal.title = single.name;
+      proposal.cookingTime = single.type === '副菜' ? '5分' : single.type === '汁物' ? '8分' : '12分';
+      proposal.matchType = `${single.type}特化レシピ`;
+    } else if (courseKeys.length === 2) {
+      const c1 = filteredCourses[courseKeys[0]];
+      const c2 = filteredCourses[courseKeys[1]];
+      proposal.mealTitle = `${c1.name} ＆ ${c2.name}`;
+      proposal.title = proposal.mealTitle;
+      proposal.cookingTime = '15分';
+      proposal.matchType = '2品の時短スピード献立';
+    } else if (courseKeys.length === 3) {
+      proposal.cookingTime = '18分';
+      proposal.matchType = '3品バランス献立';
+    }
+
+    return proposal;
+  },
+
   mockReceiptExtraction() {
     return [
       { name: '豚バラ肉', category: '肉類', quantity: '1パック(250g)', expiryDays: 2 },
@@ -770,7 +810,7 @@ ${(settings.children || []).map(c => `- ${c.name}: ${c.birthDate}生 (${stageDes
     ];
   },
 
-  mockMealProposal(inventory, settings, genre = 'auto', stepMode = 'combined', servings = 3, mealTime = 'auto') {
+  mockMealProposal(inventory, settings, genre = 'auto', stepMode = 'combined', servings = 3, mealTime = 'auto', selectedCourses = ['main', 'side', 'soup', 'staple'], stapleVariant = 'auto') {
     const sNum = parseInt(servings, 10) || 3;
     const adultGoals = settings.adultGoals || ['general'];
     const children = settings.children || [];
@@ -808,7 +848,7 @@ ${(settings.children || []).map(c => `- ${c.name}: ${c.birthDate}生 (${stageDes
 
     // 朝食向け時短プリセット (所要時間8分・軽食・卵や汁物メイン)
     if (actualMealTime === 'breakfast') {
-      return {
+      return this.filterProposalBySelectedCourses({
         mealTitle: `ふんわりかき玉とキャベツの和風朝スープ定食（${sNum}人分）`,
         genreName: '和風朝食',
         mealTime: '朝食',
@@ -859,12 +899,12 @@ ${(settings.children || []).map(c => `- ${c.name}: ${c.birthDate}生 (${stageDes
         childSeparations: childSeparations,
         adultArrangements: adultArrangements,
         safetyAlert: '忙しい朝の熱湯・レンジ加熱後の蒸気にご注意ください。1歳未満へのハチミツは厳禁です。'
-      };
+      }, selectedCourses, stapleVariant);
     }
 
     // 昼食向けワンプレート・時短ランチプリセット (所要時間12分)
     if (actualMealTime === 'lunch') {
-      return {
+      return this.filterProposalBySelectedCourses({
         mealTitle: `豚バラとキャベツの和風焼きうどん＆お吸い物ランチ（${sNum}人分）`,
         genreName: '和風ランチ',
         mealTime: '昼食',
@@ -913,12 +953,12 @@ ${(settings.children || []).map(c => `- ${c.name}: ${c.birthDate}生 (${stageDes
         childSeparations: childSeparations,
         adultArrangements: adultArrangements,
         safetyAlert: 'うどんは子どもの月齢に合わせて短くカットし、喉詰めにご注意ください。'
-      };
+      }, selectedCourses, stapleVariant);
     }
 
     // ジャンル別プリセット生成 (夕食向け)
     if (genre === 'chinese') {
-      return {
+      return this.filterProposalBySelectedCourses({
         mealTitle: `豚バラとキャベツの回鍋肉風＆中華玉子スープ定食（${sNum}人分）`,
         genreName: '中華',
         cookingTime: sNum >= 5 ? '25分' : '20分',
@@ -974,11 +1014,11 @@ ${(settings.children || []).map(c => `- ${c.name}: ${c.birthDate}生 (${stageDes
         childSeparations: childSeparations,
         adultArrangements: adultArrangements,
         safetyAlert: '1歳未満へのハチミツ・黒糖は厳禁です。中華だれ投入前に必ず子ども用を取り分けてください。'
-      };
+      }, selectedCourses, stapleVariant);
     }
 
     if (genre === 'italian') {
-      return {
+      return this.filterProposalBySelectedCourses({
         mealTitle: `豚肉とキャベツのトマト煮込み＆コンソメスープ定食（${sNum}人分）`,
         genreName: 'イタリアン',
         cookingTime: sNum >= 5 ? '25分' : '20分',
@@ -998,15 +1038,15 @@ ${(settings.children || []).map(c => `- ${c.name}: ${c.birthDate}生 (${stageDes
         ],
         seasonings: [
           { name: 'オリーブオイル', amount: sNum <= 2 ? '大さじ1' : sNum <= 4 ? '大さじ1.5' : '大さじ2' },
-          { name: 'コンソメキューブ', amount: sNum <= 2 ? '0.5個' : sNum <= 4 ? '1個' : '2個' },
-          { name: '塩・黒胡椒・ハーブ', amount: '少々' }
+          { name: '酒・塩', amount: '各小さじ1' },
+          { name: 'コンソメ', amount: '1個' }
         ],
         baseSteps: [
-          '【共通・下ごしらえ】キャベツは一口大、豚肉も食べやすく切る。にんじん・玉ねぎは薄切りにする。',
-          '【主菜・汁物 同時蒸し煮】フライパンにキャベツと豚肉を並べ、【調味料: オリーブオイル 大さじ1、酒 大さじ1】を回しかけて蓋をし、中火で約6分蒸し焼きにする。小鍋に水400ml、【調味料: コンソメ 1個】、さいの目切り豆腐、スライス野菜を入れて中火で煮立てる。',
-          '👶【子ども用取り分け＆味付け】塩やハーブを振る前に、蒸し上がった柔らかい豚肉とキャベツを取り出しキッチンバサミで1cmにカット。耐熱小皿に入れ【子ども用味付け: スープの上澄み出汁 大さじ1】をかけてレンジで10秒温め、薄味ジューシー蒸しに仕上げる。',
-          '【副菜 レンジマリネ】にんじん・玉ねぎにラップをしレンジ600Wで1分加熱。【調味料: 酢 小さじ2、オリーブ油 小さじ1、塩 少々】を和えて副菜完成。',
-          '【主菜・汁物 仕上げ・全員分完成】フライパンの大人用に【調味料: 塩・黒胡椒・ハーブソルト 少々】を振って香りを立たせる。小鍋のスープを器に注ぎ、温めたバゲットまたはご飯を添えて全員分完成！'
+          '【共通・下ごしらえ】キャベツと豚肉を食べやすい大きさに切る。にんじんと玉ねぎは薄切り、豆腐はさいの目に切る。',
+          '【主菜・汁物 同時加熱】フライパンに【調味料: オリーブオイル 大さじ1】をひき、キャベツと豚肉を敷き詰めて【調味料: 酒 大さじ1、塩 少々】を振り、蓋をして中火で約6分蒸し焼きにする。小鍋に水400mlと【調味料: コンソメ 1個】、さいの目切り豆腐を入れて煮立てる。',
+          '👶【子ども用取り分け＆味付け】フライパンから蒸し上がった豚肉とキャベツを取り出し、ハサミで小さくカット。【子ども用味付け: スープ出汁 大さじ1】をかけて薄味おかずを完成。スープからも豆腐と野菜を取り分けて冷ます。',
+          '【副菜 レンジ調理】耐熱容器に薄切りにんじん・玉ねぎを入れラップをし、レンジ600Wで1分加熱。【調味料: 酢 小さじ2、オリーブオイル 小さじ1、塩 少々】を和えてマリネ完成。',
+          '【主菜・汁物 仕上げ・全員分完成】大人用主菜に【調味料: 塩・粗挽き黒胡椒・お好みでハーブ 少々】を振って仕上げる。温かいバゲットまたはごはんと一緒に食卓へ並べて完成！'
         ],
         courseSteps: {
           main: [
@@ -1032,11 +1072,11 @@ ${(settings.children || []).map(c => `- ${c.name}: ${c.birthDate}生 (${stageDes
         childSeparations: childSeparations,
         adultArrangements: adultArrangements,
         safetyAlert: '1歳未満へのハチミツ厳禁。黒胡椒等のスパイスは大人用のみ最後に振ってください。'
-      };
+      }, selectedCourses, stapleVariant);
     }
 
     // デフォルト（和食・おまかせ）
-    return {
+    return this.filterProposalBySelectedCourses({
       mealTitle: `豚バラと旬野菜の一汁二菜 ほっこり和定食（${sNum}人分）`,
       genreName: '和食',
       cookingTime: sNum >= 5 ? '25分' : '20分',
@@ -1084,7 +1124,7 @@ ${(settings.children || []).map(c => `- ${c.name}: ${c.birthDate}生 (${stageDes
         soup: [
           '小鍋に水500mlと【調味料: 和風だし 小さじ1】、キャベツの芯、さいの目切り豆腐を入れ煮立てる。',
           '👶【子ども用取り分け】お椀に取り出し、白湯大さじ1を加えて子ども用に薄める。',
-          '大人用の鍋の火を止め、【調味料: 味噌 大さじ1.5】を溶き入れて完成。'
+          '大人用の鍋の火を止めて、【調味料: 味噌 大さじ1.5】を溶き入れて完成。'
         ],
         staple: [
           '炊きたてのごはんをよそう。子ども用は小盛りまたは軟飯に調整。'
@@ -1094,7 +1134,7 @@ ${(settings.children || []).map(c => `- ${c.name}: ${c.birthDate}生 (${stageDes
       childSeparations: childSeparations.length ? childSeparations : ['【子ども用】主菜のお肉と汁物の豆腐を調味前に小さくカットして取り分けます。'],
       adultArrangements: adultArrangements,
       safetyAlert: '1歳未満へのハチミツ・黒糖は厳禁です。喉詰まり防止のため、子ども用のお肉やにんじんは柔らかく加熱し一口サイズ以下にしてください。'
-    };
+    }, selectedCourses, stapleVariant);
   },
 
   mockMealAnalysis() {
@@ -1380,11 +1420,127 @@ const Recipe = {
   currentProposal: null,
   activeTab: 'suggest',
   hallFilter: 'all', // 'all' | 'set' | 'main' | 'side' | 'soup' | 'staple'
+  selectedCourses: ['main', 'side', 'soup', 'staple'],
+  stapleVariant: 'auto',
 
   init() {
     this.currentProposal = Store.getCurrentRecipe();
     this.bindEvents();
+    this.initCourseToggles();
     this.render();
+  },
+
+  initCourseToggles() {
+    const cards = document.querySelectorAll('[data-course-toggle]');
+    const stapleBox = document.getElementById('staple-variant-box');
+    const stapleSelect = document.getElementById('recipe-staple-variant-select');
+    const allBtn = document.getElementById('btn-select-all-courses');
+    const mainOnlyBtn = document.getElementById('btn-select-main-only');
+
+    // トグルカードのクリックイベント
+    cards.forEach(card => {
+      card.onclick = () => {
+        const course = card.dataset.courseToggle;
+        const isSelected = this.selectedCourses.includes(course);
+
+        // 最低1品選択ガード
+        if (isSelected && this.selectedCourses.length <= 1) {
+          if (window.showToast) {
+            window.showToast('最低1つの品目を選択してください', '⚠️');
+          } else {
+            alert('最低1つの品目を選択してください');
+          }
+          return;
+        }
+
+        if (isSelected) {
+          this.selectedCourses = this.selectedCourses.filter(c => c !== course);
+        } else {
+          this.selectedCourses.push(course);
+        }
+
+        this.syncCourseToggleUI();
+      };
+    });
+
+    // 全選択ボタン
+    if (allBtn) {
+      allBtn.onclick = () => {
+        this.selectedCourses = ['main', 'side', 'soup', 'staple'];
+        this.syncCourseToggleUI();
+      };
+    }
+
+    // 主菜のみボタン
+    if (mainOnlyBtn) {
+      mainOnlyBtn.onclick = () => {
+        this.selectedCourses = ['main'];
+        this.syncCourseToggleUI();
+      };
+    }
+
+    // 主食タイプセレクト
+    if (stapleSelect) {
+      stapleSelect.onchange = (e) => {
+        this.stapleVariant = e.target.value;
+      };
+    }
+
+    this.syncCourseToggleUI();
+  },
+
+  syncCourseToggleUI() {
+    const cards = document.querySelectorAll('[data-course-toggle]');
+    const stapleBox = document.getElementById('staple-variant-box');
+
+    cards.forEach(card => {
+      const course = card.dataset.courseToggle;
+      const isSelected = this.selectedCourses.includes(course);
+      if (isSelected) {
+        card.classList.add('is-selected', 'border-orange-500', 'bg-orange-50/70');
+        card.classList.remove('border-gray-200', 'bg-white', 'opacity-60');
+      } else {
+        card.classList.remove('is-selected', 'border-orange-500', 'bg-orange-50/70');
+        card.classList.add('border-gray-200', 'bg-white', 'opacity-60');
+      }
+    });
+
+    // 主食がONのときだけ主食バリエーション設定を表示
+    if (stapleBox) {
+      if (this.selectedCourses.includes('staple')) {
+        stapleBox.classList.remove('hidden');
+      } else {
+        stapleBox.classList.add('hidden');
+      }
+    }
+
+    this.updateProposalButtonLabel();
+  },
+
+  updateProposalButtonLabel() {
+    const labelEl = document.getElementById('btn-regenerate-recipe-label');
+    if (!labelEl) return;
+
+    const count = this.selectedCourses.length;
+    const COURSE_NAMES = { main: '主菜', side: '副菜', soup: '汁物', staple: '主食' };
+
+    if (count === 4) {
+      labelEl.textContent = '✨ 1食分の献立（フルセット）を提案';
+    } else if (count === 1) {
+      const single = this.selectedCourses[0];
+      const singleName = COURSE_NAMES[single] || '料理';
+      if (single === 'main') labelEl.textContent = '🥩 主菜のみ（メインおかず）を提案';
+      else if (single === 'side') labelEl.textContent = '🥗 副菜のみ（小鉢・常備菜）を提案';
+      else if (single === 'soup') labelEl.textContent = '🥣 汁物のみ（スープ・味噌汁）を提案';
+      else if (single === 'staple') labelEl.textContent = '🍚 主食のみ（ごはん・麺・パン）を提案';
+      else labelEl.textContent = `✨ ${singleName}のみを提案`;
+    } else {
+      const selectedNames = ['main', 'side', 'soup', 'staple']
+        .filter(c => this.selectedCourses.includes(c))
+        .map(c => COURSE_NAMES[c])
+        .join('＋');
+      labelEl.textContent = `✨ ${count}品（${selectedNames}）の献立を提案`;
+    }
   },
 
   formatStepText(text) {
@@ -1474,7 +1630,16 @@ const Recipe = {
       const genre = document.getElementById('recipe-genre-select')?.value || 'auto';
       const stepMode = document.getElementById('recipe-step-mode-select')?.value || Store.getSettings().cookingStepMode || 'combined';
       const servings = document.getElementById('recipe-servings-select')?.value || Store.getSettings().defaultServings || 3;
-      this.currentProposal = await ApiClient.generateMealProposal(Store.getInventory(), Store.getSettings(), genre, stepMode, servings, mealTime);
+      this.currentProposal = await ApiClient.generateMealProposal(
+        Store.getInventory(),
+        Store.getSettings(),
+        genre,
+        stepMode,
+        servings,
+        mealTime,
+        this.selectedCourses,
+        this.stapleVariant
+      );
       Store.saveCurrentRecipe(this.currentProposal);
       this.render();
     } finally {
@@ -1729,67 +1894,37 @@ const Recipe = {
           <p class="text-xs text-gray-500 mt-0.5">${r.description || '主食・主菜・副菜・汁物の1食分バランス献立セット'}</p>
         </div>
 
-        <!-- 1食分の献立構成 (主食・主菜・副菜・汁物) - 各品目に⭐お気に入りボタンを設置 -->
-        <div class="grid grid-cols-2 gap-2 pt-1">
-          <!-- 主食 -->
-          <div class="p-2.5 rounded-xl bg-orange-50/50 border border-orange-100 text-xs flex flex-col justify-between">
-            <div>
-              <div class="flex items-center justify-between font-black text-orange-700 mb-0.5">
-                <span>🍚 主食:</span>
-                <div class="flex items-center space-x-1">
-                  <button type="button" data-fav-course="staple" class="course-fav-btn p-0.5 text-xs ${isStapleFav ? 'is-active text-amber-500' : 'text-gray-300 hover:text-amber-400'}" title="主食をお気に入り登録">⭐</button>
-                  <button type="button" data-shuffle-course="staple" class="text-[10px] font-bold text-orange-600 bg-white/90 hover:bg-white px-1.5 py-0.5 rounded border border-orange-200 active:scale-95 transition-all shadow-2xs">🔄 変更</button>
+        <!-- 献立構成カード (選択された品目のみ動的グリッド描画) -->
+        <div class="grid ${Object.keys(courses).length === 1 ? 'grid-cols-1' : 'grid-cols-2'} gap-2 pt-1">
+          ${(() => {
+            const COURSE_META = {
+              staple: { icon: '🍚', label: '主食', bg: 'bg-orange-50/50 border-orange-100 text-orange-700', btnText: 'text-orange-600 border-orange-200' },
+              main:   { icon: '🥩', label: '主菜', bg: 'bg-rose-50/50 border-rose-100 text-rose-700',     btnText: 'text-rose-600 border-rose-200' },
+              side:   { icon: '🥗', label: '副菜', bg: 'bg-emerald-50/50 border-emerald-100 text-emerald-700', btnText: 'text-emerald-600 border-emerald-200' },
+              soup:   { icon: '🥣', label: '汁物', bg: 'bg-amber-50/50 border-amber-100 text-amber-700',   btnText: 'text-amber-600 border-amber-200' }
+            };
+            const orderedKeys = ['main', 'side', 'soup', 'staple'].filter(k => courses[k]);
+            return orderedKeys.map(k => {
+              const c = courses[k];
+              const meta = COURSE_META[k] || { icon: '🍽️', label: c.type || '料理', bg: 'bg-gray-50 border-gray-100 text-gray-700', btnText: 'text-gray-600 border-gray-200' };
+              const isFav = c.name ? Store.isCourseFavorite(c.name) : false;
+              return `
+                <div class="p-2.5 rounded-xl ${meta.bg} border text-xs flex flex-col justify-between">
+                  <div>
+                    <div class="flex items-center justify-between font-black ${meta.bg.split(' ').pop()} mb-0.5">
+                      <span>${meta.icon} ${meta.label}:</span>
+                      <div class="flex items-center space-x-1">
+                        <button type="button" data-fav-course="${k}" class="course-fav-btn p-0.5 text-xs ${isFav ? 'is-active text-amber-500' : 'text-gray-300 hover:text-amber-400'}" title="${meta.label}をお気に入り登録">⭐</button>
+                        <button type="button" data-shuffle-course="${k}" class="text-[10px] font-bold ${meta.btnText} bg-white/90 hover:bg-white px-1.5 py-0.5 rounded border active:scale-95 transition-all shadow-2xs">🔄 変更</button>
+                      </div>
+                    </div>
+                    <div class="font-bold text-gray-800 text-[11px] leading-snug">${c.name || title}</div>
+                  </div>
+                  <div class="text-[9px] text-gray-400 mt-1">${c.note || ''}</div>
                 </div>
-              </div>
-              <div class="font-bold text-gray-800 text-[11px]">${courses.staple?.name || 'ごはん'}</div>
-            </div>
-            <div class="text-[9px] text-gray-400 mt-1">${courses.staple?.note || '適量'}</div>
-          </div>
-
-          <!-- 主菜 -->
-          <div class="p-2.5 rounded-xl bg-rose-50/50 border border-rose-100 text-xs flex flex-col justify-between">
-            <div>
-              <div class="flex items-center justify-between font-black text-rose-700 mb-0.5">
-                <span>🥩 主菜:</span>
-                <div class="flex items-center space-x-1">
-                  <button type="button" data-fav-course="main" class="course-fav-btn p-0.5 text-xs ${isMainFav ? 'is-active text-amber-500' : 'text-gray-300 hover:text-amber-400'}" title="主菜をお気に入り登録">⭐</button>
-                  <button type="button" data-shuffle-course="main" class="text-[10px] font-bold text-rose-600 bg-white/90 hover:bg-white px-1.5 py-0.5 rounded border border-rose-200 active:scale-95 transition-all shadow-2xs">🔄 変更</button>
-                </div>
-              </div>
-              <div class="font-bold text-gray-800 text-[11px]">${courses.main?.name || title}</div>
-            </div>
-            <div class="text-[9px] text-gray-400 mt-1">${courses.main?.note || 'メインおかず'}</div>
-          </div>
-
-          <!-- 副菜 -->
-          <div class="p-2.5 rounded-xl bg-emerald-50/50 border border-emerald-100 text-xs flex flex-col justify-between">
-            <div>
-              <div class="flex items-center justify-between font-black text-emerald-700 mb-0.5">
-                <span>🥗 副菜:</span>
-                <div class="flex items-center space-x-1">
-                  <button type="button" data-fav-course="side" class="course-fav-btn p-0.5 text-xs ${isSideFav ? 'is-active text-amber-500' : 'text-gray-300 hover:text-amber-400'}" title="副菜をお気に入り登録">⭐</button>
-                  <button type="button" data-shuffle-course="side" class="text-[10px] font-bold text-emerald-600 bg-white/90 hover:bg-white px-1.5 py-0.5 rounded border border-emerald-200 active:scale-95 transition-all shadow-2xs">🔄 変更</button>
-                </div>
-              </div>
-              <div class="font-bold text-gray-800 text-[11px]">${courses.side?.name || '野菜の小鉢'}</div>
-            </div>
-            <div class="text-[9px] text-gray-400 mt-1">${courses.side?.note || '食物繊維補給'}</div>
-          </div>
-
-          <!-- 汁物 -->
-          <div class="p-2.5 rounded-xl bg-amber-50/50 border border-amber-100 text-xs flex flex-col justify-between">
-            <div>
-              <div class="flex items-center justify-between font-black text-amber-700 mb-0.5">
-                <span>🥣 汁物:</span>
-                <div class="flex items-center space-x-1">
-                  <button type="button" data-fav-course="soup" class="course-fav-btn p-0.5 text-xs ${isSoupFav ? 'is-active text-amber-500' : 'text-gray-300 hover:text-amber-400'}" title="汁物をお気に入り登録">⭐</button>
-                  <button type="button" data-shuffle-course="soup" class="text-[10px] font-bold text-amber-600 bg-white/90 hover:bg-white px-1.5 py-0.5 rounded border border-amber-200 active:scale-95 transition-all shadow-2xs">🔄 変更</button>
-                </div>
-              </div>
-              <div class="font-bold text-gray-800 text-[11px]">${courses.soup?.name || '具だくさん味噌汁'}</div>
-            </div>
-            <div class="text-[9px] text-gray-400 mt-1">${courses.soup?.note || '温活・水分補給'}</div>
-          </div>
+              `;
+            }).join('');
+          })()}
         </div>
 
         <!-- 材料 ＆ 調味料 -->
