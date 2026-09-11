@@ -18,6 +18,7 @@ const DEFAULT_SETTINGS = {
   enableExternalSync: false, // 外部記録アプリ連携 (デフォルトOFF)
   cookingStepMode: 'combined', // 調理手順スタイル: combined (まとめて同時) | by_course (品目別ごと)
   defaultExpiryDays: 3, // 食材追加時の消費期限デフォルト日数 (1, 2, 3, 5, 7, 10, 14等)
+  confirmBeforeDelete: true, // 食材削除時に確認メッセージを表示 (デフォルトON)
   defaultServings: 2.5, // 自動算出される世帯作成人数
   adultCount: 2, // 大人 (標準: 1.0人前)
   growthCount: 0, // 食べ盛り・アスリート (大盛り: 1.5人前)
@@ -2359,52 +2360,78 @@ const Inventory = {
     }
 
     const selectedCount = this.selectedIds.size;
+    const isAllSelected = selectedCount > 0 && selectedCount === items.length;
 
     container.innerHTML = `
-      <div class="space-y-2">
-        <!-- 一括操作 ＆ 選択バー -->
+      <div class="space-y-2.5">
+        <!-- 一括操作 ＆ 選択バー (タップしやすいモダンボタン) -->
         <div class="flex items-center justify-between bg-gray-50 p-2 rounded-xl border border-gray-100 text-xs">
-          <label class="flex items-center space-x-1.5 cursor-pointer font-bold text-gray-700 select-none">
-            <input type="checkbox" id="inv-select-all" ${selectedCount > 0 && selectedCount === items.length ? 'checked' : ''} class="rounded text-orange-500 w-3.5 h-3.5">
+          <button type="button" id="btn-toggle-select-all" class="flex items-center space-x-1.5 px-2 py-1 rounded-lg bg-white border border-gray-200 font-bold text-gray-700 active:scale-95 shadow-2xs">
+            <span class="w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${isAllSelected ? 'bg-orange-500 text-white font-black' : 'border border-gray-300'}">
+              ${isAllSelected ? '✓' : ''}
+            </span>
             <span>すべて選択 (${selectedCount}/${items.length})</span>
-          </label>
+          </button>
+
           ${selectedCount > 0 ? `
             <div class="flex items-center space-x-1">
-              <button type="button" id="btn-bulk-exp" class="px-2 py-1 rounded-lg bg-white border border-gray-200 text-gray-700 font-bold hover:bg-gray-100 text-[11px] active:scale-95 shadow-2xs">
-                ⏰ 期限+2日
+              <button type="button" id="btn-open-bulk-edit" class="px-2.5 py-1.5 rounded-lg bg-orange-500 text-white font-bold text-xs active:scale-95 shadow-2xs flex items-center space-x-1">
+                <span>✏️</span>
+                <span>まとめて修正</span>
               </button>
-              <button type="button" id="btn-bulk-consume" class="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-bold border border-emerald-200 text-[11px] active:scale-95 shadow-2xs">
+              <button type="button" id="btn-bulk-consume" class="px-2 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-bold border border-emerald-200 text-xs active:scale-95 shadow-2xs">
                 🍳 使った
               </button>
-              <button type="button" id="btn-bulk-delete" class="px-2 py-1 rounded-lg bg-rose-50 text-rose-700 font-bold border border-rose-200 text-[11px] active:scale-95 shadow-2xs">
+              <button type="button" id="btn-bulk-delete" class="px-2 py-1.5 rounded-lg bg-rose-50 text-rose-700 font-bold border border-rose-200 text-xs active:scale-95 shadow-2xs">
                 🗑️ 削除
               </button>
             </div>
           ` : `
-            <span class="text-[10px] text-gray-400">タップで詳細・手修正</span>
+            <span class="text-[10px] text-gray-400">カードをタップで選択</span>
           `}
         </div>
 
-        <!-- 食材一覧カード -->
-        <div class="space-y-1.5">
+        <!-- 食材一覧カード (トグル選択方式: カード全体タップでON/OFF) -->
+        <div class="space-y-2">
           ${items.map(item => {
-            const isChecked = this.selectedIds.has(item.id);
+            const isSelected = this.selectedIds.has(item.id);
             return `
-              <div class="bg-white p-2.5 rounded-xl border ${isChecked ? 'border-orange-400 bg-orange-50/20' : 'border-gray-100'} flex items-center justify-between text-xs transition-all shadow-2xs">
-                <div class="flex items-center space-x-2.5 flex-1 min-w-0">
-                  <input type="checkbox" data-inv-chk="${item.id}" ${isChecked ? 'checked' : ''} class="rounded text-orange-500 w-4 h-4 cursor-pointer shrink-0">
-                  <div class="flex-1 min-w-0 cursor-pointer" data-inv-edit="${item.id}">
-                    <div class="font-bold text-gray-800 truncate flex items-center space-x-1">
-                      <span>${item.name}</span>
-                      <span class="text-[10px] text-orange-600 font-semibold shrink-0">(あと${item.expiryDays}日)</span>
+              <div data-inv-card="${item.id}" class="rounded-2xl p-3 border transition-all flex items-center justify-between text-xs cursor-pointer select-none ${
+                isSelected
+                  ? 'border-2 border-orange-500 bg-orange-50/60 shadow-sm'
+                  : 'bg-white border-gray-100 hover:border-gray-200 shadow-2xs'
+              }">
+                <!-- 左側: トグル選択丸バッジ ＆ 食材情報 -->
+                <div class="flex items-center space-x-3 flex-1 min-w-0">
+                  <div class="w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-all ${
+                    isSelected
+                      ? 'bg-orange-500 text-white text-[11px] font-black'
+                      : 'border-2 border-gray-300 bg-white'
+                  }">
+                    ${isSelected ? '✓' : ''}
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="font-black text-gray-800 text-xs truncate flex items-center space-x-1.5">
+                      <span class="truncate">${item.name}</span>
+                      <span class="text-[10px] px-1.5 py-0.2 rounded-md font-bold shrink-0 ${
+                        (item.expiryDays <= 1)
+                          ? 'bg-rose-100 text-rose-700'
+                          : (item.expiryDays <= 3)
+                          ? 'bg-orange-100 text-orange-700'
+                          : 'bg-gray-100 text-gray-600'
+                      }">(あと${item.expiryDays}日)</span>
                     </div>
-                    <div class="text-gray-400 text-[10px] mt-0.5 truncate">${item.category} • ${item.quantity}</div>
+                    <div class="text-gray-400 text-[10px] mt-0.5 truncate">${item.category || 'その他'} • 数量: ${item.quantity || '1個'}</div>
                   </div>
                 </div>
+
+                <!-- 右側: 独立アクションボタン (イベント伝播停止付き) -->
                 <div class="flex items-center space-x-1 shrink-0 ml-2">
-                  <button type="button" data-inv-edit-btn="${item.id}" class="p-1 px-1.5 rounded-lg bg-gray-50 hover:bg-gray-100 text-gray-600 font-bold text-xs border border-gray-200 active:scale-95 transition-all" title="食材を編集">✏️</button>
-                  <button type="button" data-consume-id="${item.id}" class="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100 text-xs border border-emerald-100 active:scale-95 transition-all">使った</button>
-                  <button type="button" data-del-id="${item.id}" class="p-1 text-gray-400 hover:text-rose-500 text-xs" title="削除">🗑️</button>
+                  <button type="button" data-inv-edit-btn="${item.id}" class="p-1.5 px-2 rounded-xl bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold text-xs border border-gray-200 active:scale-95 transition-all flex items-center space-x-1" title="食材を手修正">
+                    <span>✏️</span>
+                    <span class="text-[10px]">修正</span>
+                  </button>
+                  <button type="button" data-del-id="${item.id}" class="p-1.5 text-gray-400 hover:text-rose-500 text-sm active:scale-95" title="削除">🗑️</button>
                 </div>
               </div>
             `;
@@ -2413,37 +2440,38 @@ const Inventory = {
       </div>
     `;
 
-    // 全選択チェックボックス
-    const selectAll = document.getElementById('inv-select-all');
-    if (selectAll) {
-      selectAll.onchange = (e) => {
-        if (e.target.checked) {
-          this.selectedIds = new Set(items.map(i => i.id));
-        } else {
+    // 全選択トグルボタン
+    const selectAllBtn = document.getElementById('btn-toggle-select-all');
+    if (selectAllBtn) {
+      selectAllBtn.onclick = () => {
+        if (this.selectedIds.size === items.length) {
           this.selectedIds.clear();
+        } else {
+          this.selectedIds = new Set(items.map(i => i.id));
         }
         this.render();
       };
     }
 
-    // 各アイテムのチェックボックス
-    container.querySelectorAll('[data-inv-chk]').forEach(chk => {
-      chk.onchange = (e) => {
-        const id = chk.dataset.invChk;
-        if (e.target.checked) {
-          this.selectedIds.add(id);
-        } else {
+    // カードタップによるトグル選択 (ON/OFF)
+    container.querySelectorAll('[data-inv-card]').forEach(card => {
+      card.onclick = () => {
+        const id = card.dataset.invCard;
+        if (this.selectedIds.has(id)) {
           this.selectedIds.delete(id);
+        } else {
+          this.selectedIds.add(id);
         }
         this.render();
       };
     });
 
-    // 食材名タップまたは「✏️」ボタン押下で編集モーダルを起動
-    container.querySelectorAll('[data-inv-edit], [data-inv-edit-btn]').forEach(el => {
-      el.onclick = (e) => {
+    // ✏️ 修正ボタン押下で単品編集モーダルを起動 (イベント伝播を停止)
+    container.querySelectorAll('[data-inv-edit-btn]').forEach(btn => {
+      btn.onclick = (e) => {
+        e.preventDefault();
         e.stopPropagation();
-        const id = el.dataset.invEdit || el.dataset.invEditBtn;
+        const id = btn.dataset.invEditBtn;
         const targetItem = items.find(i => i.id === id);
         if (targetItem && window.App?.openItemEditModal) {
           window.App.openItemEditModal(targetItem);
@@ -2451,23 +2479,26 @@ const Inventory = {
       };
     });
 
-    // 一括期限延長ボタン
-    const bulkExpBtn = document.getElementById('btn-bulk-exp');
-    if (bulkExpBtn) {
-      bulkExpBtn.onclick = () => {
-        const count = this.selectedIds.size;
-        if (count === 0) return;
-        this.selectedIds.forEach(id => {
-          const item = items.find(i => i.id === id);
-          if (item) {
-            Store.updateInventoryItem(id, { expiryDays: (item.expiryDays || 0) + 2 });
+    // 単品削除ボタン (設定に応じて確認ダイアログ)
+    container.querySelectorAll('[data-del-id]').forEach(btn => {
+      btn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const id = btn.dataset.delId;
+        const targetItem = items.find(i => i.id === id);
+        if (!targetItem) return;
+
+        const needConfirm = Store.getSettings().confirmBeforeDelete !== false;
+        if (needConfirm) {
+          if (!confirm(`「${targetItem.name}」を冷蔵庫から削除しますか？`)) {
+            return;
           }
-        });
-        if (window.showToast) window.showToast(`選択した${count}品の消費期限を+2日延長しました`, '⏰');
-        this.selectedIds.clear();
-        this.render();
+        }
+        Store.deleteInventoryItem(id);
+        this.selectedIds.delete(id);
+        if (window.showToast) window.showToast(`「${targetItem.name}」を削除しました`, '🗑️');
       };
-    }
+    });
 
     // 一括使ったボタン
     const bulkConsumeBtn = document.getElementById('btn-bulk-consume');
@@ -2475,7 +2506,9 @@ const Inventory = {
       bulkConsumeBtn.onclick = () => {
         const count = this.selectedIds.size;
         if (count === 0) return;
-        if (confirm(`選択した${count}品の食材を「使った」として消費しますか？`)) {
+        const selectedItems = items.filter(i => this.selectedIds.has(i.id));
+        const itemNames = selectedItems.map(i => `・${i.name}`).join('\n');
+        if (confirm(`選択した以下の${count}品を「使った」として消費しますか？\n\n${itemNames}`)) {
           this.selectedIds.forEach(id => Store.consumeInventoryItem(id));
           if (window.showToast) window.showToast(`${count}品の食材を消費しました`, '🍳');
           this.selectedIds.clear();
@@ -2484,36 +2517,110 @@ const Inventory = {
       };
     }
 
-    // 一括削除ボタン
+    // 一括削除ボタン (設定に応じて対象リスト付きの確認ダイアログ)
     const bulkDelBtn = document.getElementById('btn-bulk-delete');
     if (bulkDelBtn) {
       bulkDelBtn.onclick = () => {
         const count = this.selectedIds.size;
         if (count === 0) return;
-        if (confirm(`選択した${count}品の食材を冷蔵庫から削除しますか？`)) {
-          this.selectedIds.forEach(id => Store.deleteInventoryItem(id));
-          if (window.showToast) window.showToast(`${count}品の食材を削除しました`, '🗑️');
-          this.selectedIds.clear();
-          this.render();
+        const selectedItems = items.filter(i => this.selectedIds.has(i.id));
+        const itemNames = selectedItems.map(i => `・${i.name}`).join('\n');
+
+        const needConfirm = Store.getSettings().confirmBeforeDelete !== false;
+        if (needConfirm) {
+          if (!confirm(`選択した以下の${count}品を冷蔵庫から削除しますか？\n\n${itemNames}`)) {
+            return;
+          }
         }
+
+        this.selectedIds.forEach(id => Store.deleteInventoryItem(id));
+        if (window.showToast) window.showToast(`${count}品の食材を削除しました`, '🗑️');
+        this.selectedIds.clear();
+        this.render();
       };
     }
 
-    // 単品使ったボタン
-    container.querySelectorAll('[data-consume-id]').forEach(btn => {
-      btn.onclick = (e) => {
-        e.stopPropagation();
-        Store.consumeInventoryItem(btn.dataset.consumeId);
+    // 一括修正モーダルのバインド
+    const openBulkEditBtn = document.getElementById('btn-open-bulk-edit');
+    const bulkModal = document.getElementById('bulk-edit-modal');
+    const bulkCancelBtn = document.getElementById('bulk-edit-cancel-btn');
+    const bulkTargetLabel = document.getElementById('bulk-edit-target-label');
+
+    if (openBulkEditBtn && bulkModal) {
+      openBulkEditBtn.onclick = () => {
+        const count = this.selectedIds.size;
+        if (count === 0) return;
+        const selectedItems = items.filter(i => this.selectedIds.has(i.id));
+        if (bulkTargetLabel) {
+          bulkTargetLabel.textContent = `選択中: ${count}品 (${selectedItems.map(i => i.name).join('、')})`;
+        }
+        bulkModal.classList.remove('hidden');
+      };
+    }
+
+    if (bulkCancelBtn && bulkModal) {
+      bulkCancelBtn.onclick = () => bulkModal.classList.add('hidden');
+    }
+
+    // 一括延長ボタン群 (+1, +2, +3, +7日)
+    document.querySelectorAll('[data-bulk-add-days]').forEach(btn => {
+      btn.onclick = () => {
+        const addDays = parseInt(btn.dataset.bulkAddDays, 10);
+        const count = this.selectedIds.size;
+        this.selectedIds.forEach(id => {
+          const it = items.find(i => i.id === id);
+          if (it) {
+            Store.updateInventoryItem(id, { expiryDays: (it.expiryDays || 0) + addDays });
+          }
+        });
+        if (window.showToast) window.showToast(`${count}品の期限を+${addDays}日延長しました`, '⏰');
+        bulkModal?.classList.add('hidden');
+        this.selectedIds.clear();
+        this.render();
       };
     });
 
-    // 単品削除ボタン
-    container.querySelectorAll('[data-del-id]').forEach(btn => {
-      btn.onclick = (e) => {
-        e.stopPropagation();
-        Store.deleteInventoryItem(btn.dataset.delId);
+    // 日数統一設定ボタン
+    const applyDaysBtn = document.getElementById('btn-bulk-apply-days');
+    const setDaysInput = document.getElementById('bulk-set-days-input');
+    if (applyDaysBtn && setDaysInput) {
+      applyDaysBtn.onclick = () => {
+        const days = parseInt(setDaysInput.value, 10);
+        if (isNaN(days) || days < 0) {
+          alert('有効な日数を入力してください');
+          return;
+        }
+        const count = this.selectedIds.size;
+        this.selectedIds.forEach(id => {
+          Store.updateInventoryItem(id, { expiryDays: days });
+        });
+        if (window.showToast) window.showToast(`${count}品の期限を「あと${days}日」に統一しました`, '⏰');
+        bulkModal?.classList.add('hidden');
+        this.selectedIds.clear();
+        this.render();
       };
-    });
+    }
+
+    // カテゴリ一括変更ボタン
+    const applyCatBtn = document.getElementById('btn-bulk-apply-cat');
+    const catSelect = document.getElementById('bulk-cat-select');
+    if (applyCatBtn && catSelect) {
+      applyCatBtn.onclick = () => {
+        const cat = catSelect.value;
+        if (!cat) {
+          alert('変更先のカテゴリを選択してください');
+          return;
+        }
+        const count = this.selectedIds.size;
+        this.selectedIds.forEach(id => {
+          Store.updateInventoryItem(id, { category: cat });
+        });
+        if (window.showToast) window.showToast(`${count}品のカテゴリを「${cat}」に変更しました`, '🏷️');
+        bulkModal?.classList.add('hidden');
+        this.selectedIds.clear();
+        this.render();
+      };
+    }
   }
 };
 
@@ -2696,6 +2803,8 @@ const App = {
     if (handSelect) handSelect.value = settings.handMode || 'right';
     if (expDaysSelect) expDaysSelect.value = settings.defaultExpiryDays || 3;
     if (syncCheckbox) syncCheckbox.checked = !!settings.enableExternalSync;
+    const confirmDeleteChk = document.getElementById('setting-confirm-delete');
+    if (confirmDeleteChk) confirmDeleteChk.checked = settings.confirmBeforeDelete !== false;
     if (stepModeSelect) stepModeSelect.value = settings.cookingStepMode || 'combined';
     if (recipeStepSelect) recipeStepSelect.value = settings.cookingStepMode || 'combined';
     if (adultCountSelect) adultCountSelect.value = settings.adultCount ?? 2;
@@ -2948,6 +3057,7 @@ const App = {
         growthCount: growthCount,
         defaultServings: autoServings,
         enableExternalSync: document.getElementById('setting-enable-sync')?.checked || false,
+        confirmBeforeDelete: document.getElementById('setting-confirm-delete')?.checked !== false,
         adultGoals: selectedGoals.length ? selectedGoals : ['general']
       };
       Store.saveSettings(updated);
@@ -3098,6 +3208,8 @@ const App = {
     });
   }
 };
+
+window.App = App;
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => App.init());

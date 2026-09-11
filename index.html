@@ -492,6 +492,15 @@
               </div>
             </div>
 
+            <!-- 食材削除時の確認ダイアログ設定 -->
+            <div class="pt-2 border-t border-gray-100">
+              <label class="flex items-center space-x-2 text-xs font-bold text-gray-700 cursor-pointer">
+                <input type="checkbox" id="setting-confirm-delete" checked class="rounded text-orange-500 w-4 h-4">
+                <span>🗑️ 食材削除時に確認メッセージを表示する</span>
+              </label>
+              <p class="text-[10px] text-gray-400 ml-6">OFFにすると確認なしでワンタップ即時削除できます</p>
+            </div>
+
             <button type="submit" class="w-full py-2.5 rounded-xl text-white font-bold text-xs theme-primary-bg shadow-xs active:scale-95 transition-all mt-2">
               家族設定を保存する
             </button>
@@ -693,6 +702,54 @@
       </div>
     </div>
 
+    <!-- 4. 食材一括修正モーダル -->
+    <div id="bulk-edit-modal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl animate-fade-in space-y-3">
+        <div class="flex items-center justify-between pb-2 border-b border-gray-100">
+          <div>
+            <h3 class="font-bold text-gray-800 text-base">✏️ 食材をまとめて修正</h3>
+            <p id="bulk-edit-target-label" class="text-xs text-orange-600 font-bold">選択中: 0品</p>
+          </div>
+          <button id="bulk-edit-cancel-btn" class="text-gray-400 p-1 text-lg">&times;</button>
+        </div>
+        <div class="space-y-3 text-xs">
+          <!-- 期限一括操作 -->
+          <div class="p-3 bg-orange-50/60 rounded-xl border border-orange-100 space-y-2">
+            <span class="font-black text-gray-700 block">⏰ 消費期限の一括変更</span>
+            <div class="flex items-center space-x-2">
+              <button type="button" data-bulk-add-days="1" class="flex-1 py-1.5 bg-white border border-orange-200 rounded-lg font-bold text-orange-700 hover:bg-orange-100 active:scale-95 shadow-2xs">＋1日</button>
+              <button type="button" data-bulk-add-days="2" class="flex-1 py-1.5 bg-white border border-orange-200 rounded-lg font-bold text-orange-700 hover:bg-orange-100 active:scale-95 shadow-2xs">＋2日</button>
+              <button type="button" data-bulk-add-days="3" class="flex-1 py-1.5 bg-white border border-orange-200 rounded-lg font-bold text-orange-700 hover:bg-orange-100 active:scale-95 shadow-2xs">＋3日</button>
+              <button type="button" data-bulk-add-days="7" class="flex-1 py-1.5 bg-white border border-orange-200 rounded-lg font-bold text-orange-700 hover:bg-orange-100 active:scale-95 shadow-2xs">＋7日</button>
+            </div>
+            <div class="flex items-center space-x-2 pt-1">
+              <span class="text-gray-500 font-bold shrink-0">指定日数に統一:</span>
+              <input type="number" id="bulk-set-days-input" min="0" max="60" placeholder="例: 5" class="w-16 p-1.5 bg-white border border-gray-200 rounded-lg text-center font-bold">
+              <span class="text-gray-500 shrink-0">日にする</span>
+              <button type="button" id="btn-bulk-apply-days" class="px-3 py-1.5 bg-orange-500 text-white font-bold rounded-lg active:scale-95">設定</button>
+            </div>
+          </div>
+
+          <!-- カテゴリ一括変更 -->
+          <div class="p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-2">
+            <span class="font-black text-gray-700 block">🏷️ カテゴリの一括変更</span>
+            <div class="flex items-center space-x-2">
+              <select id="bulk-cat-select" class="flex-1 p-2 bg-white border border-gray-200 rounded-lg font-bold text-gray-700">
+                <option value="" selected>変更しない (そのまま)</option>
+                <option value="野菜">野菜</option>
+                <option value="肉類">肉類</option>
+                <option value="魚介">魚介</option>
+                <option value="卵・大豆">卵・大豆</option>
+                <option value="乳製品">乳製品</option>
+                <option value="その他">その他</option>
+              </select>
+              <button type="button" id="btn-bulk-apply-cat" class="px-3 py-2 bg-gray-800 text-white font-bold rounded-lg active:scale-95">変更</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- トースト通知コンテナ (画面遷移せず保存を伝える) -->
     <div id="app-toast" class="bg-gray-900/90 text-white text-xs font-bold px-4 py-2.5 rounded-full shadow-2xl flex items-center space-x-2 backdrop-blur-xs border border-white/20">
       <span id="app-toast-icon">⭐</span>
@@ -710,6 +767,6 @@
   </div>
 
   <!-- JavaScript統合バンドル（CORS制限のない完全ローカル対応） -->
-  <script src="js/app.bundle.js?v=20260911_2210"></script>
+  <script src="js/app.bundle.js?v=20260911_2235"></script>
 </body>
 </html>
