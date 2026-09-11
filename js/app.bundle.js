@@ -2341,7 +2341,24 @@ const App = {
     Recipe.init();
     Inventory.render();
 
-    this.switchTab(settings.initialTab || 'dashboard');
+    // リロード時は直前に開いていたタブを復元、初回アクセス時は設定の初期タブ（分析/ダッシュボード）を開く
+    const hashTab = window.location.hash ? window.location.hash.replace('#', '') : null;
+    let rememberedTab = null;
+    try {
+      rememberedTab = sessionStorage.getItem('active_tab');
+    } catch (e) {
+      console.warn('sessionStorage is not accessible', e);
+    }
+
+    const validTabs = ['dashboard', 'recipe', 'inventory', 'nutrition', 'settings'];
+    let targetTab = settings.initialTab || 'dashboard';
+    if (hashTab && validTabs.includes(hashTab)) {
+      targetTab = hashTab;
+    } else if (rememberedTab && validTabs.includes(rememberedTab)) {
+      targetTab = rememberedTab;
+    }
+
+    this.switchTab(targetTab);
 
     window.addEventListener('app:inventory-updated', () => Inventory.render());
   },
@@ -2575,6 +2592,15 @@ const App = {
 
   switchTab(tabId) {
     this.activeTab = tabId;
+
+    try {
+      sessionStorage.setItem('active_tab', tabId);
+      if (window.location.hash !== `#${tabId}`) {
+        history.replaceState(null, '', `#${tabId}`);
+      }
+    } catch (e) {
+      // ignore
+    }
 
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
     document.getElementById(`tab-panel-${tabId}`)?.classList.remove('hidden');
