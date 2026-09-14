@@ -1589,9 +1589,9 @@ const Nutrition = {
         : '<span class="text-[9px] px-1.5 py-0.2 rounded-md font-bold bg-gray-50 text-gray-600 border border-gray-200">🏠 自炊</span>';
 
       return `
-        <div class="bg-white p-3 rounded-2xl border border-gray-100 flex items-center justify-between text-xs shadow-2xs hover:border-gray-200 transition-all space-x-3">
-          <!-- 左側: 写真サムネイル (クリックで拡大) -->
-          <div class="shrink-0 cursor-pointer" data-log-thumb="${log.id}" title="タップして写真を拡大">
+        <div data-log-card="${log.id}" class="bg-white p-3 rounded-2xl border border-gray-100 flex items-center justify-between text-xs shadow-2xs hover:border-orange-200 hover:shadow-xs cursor-pointer select-none transition-all space-x-3" title="タップして写真を拡大表示">
+          <!-- 左側: 写真サムネイル -->
+          <div class="shrink-0">
             <div id="thumb-container-${log.id}" class="w-13 h-13 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center overflow-hidden text-xl shadow-2xs">
               <span>🍽️</span>
             </div>
@@ -1618,8 +1618,11 @@ const Nutrition = {
               </div>
             ` : ''}
 
-            <div class="text-[10px] text-gray-500 mt-1">
-              P:${log.protein}g / F:${log.fat}g / C:${log.carbs}g
+            <!-- 栄養素（日本語で分かりやすく明記） -->
+            <div class="text-[10px] text-gray-500 mt-1 flex flex-wrap gap-x-2">
+              <span>たんぱく質: <strong class="text-blue-600 font-bold">${log.protein}g</strong></span>
+              <span>脂質: <strong class="text-amber-600 font-bold">${log.fat}g</strong></span>
+              <span>炭水化物: <strong class="text-purple-600 font-bold">${log.carbs}g</strong></span>
             </div>
           </div>
 
@@ -1644,10 +1647,10 @@ const Nutrition = {
       }
     });
 
-    // サムネイルクリックで拡大モーダル表示
-    container.querySelectorAll('[data-log-thumb]').forEach(el => {
-      el.onclick = () => {
-        const id = el.dataset.logThumb;
+    // カード全体（タイトル・サムネイル・本文等）タップで拡大モーダル表示
+    container.querySelectorAll('[data-log-card]').forEach(card => {
+      card.onclick = () => {
+        const id = card.dataset.logCard;
         const targetLog = sortedLogs.find(l => l.id === id);
         if (targetLog) {
           const typeInfo = this.getMealTypeInfo(targetLog.mealType);
@@ -1657,9 +1660,11 @@ const Nutrition = {
       };
     });
 
-    // 削除ボタン
+    // 削除ボタン (イベント伝播を停止してカードタップの拡大と重複しないようにする)
     container.querySelectorAll('[data-del-log]').forEach(btn => {
-      btn.onclick = async () => {
+      btn.onclick = async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         const id = btn.dataset.delLog;
         const targetLog = sortedLogs.find(l => l.id === id);
         const name = targetLog?.dishName || 'この食事ログ';
