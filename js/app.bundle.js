@@ -54,6 +54,120 @@ function getLocalDateStr(dateInput = new Date()) {
   return `${y}-${m}-${d}`;
 }
 
+// ================= IndexedDB 画像管理 & 自動圧縮 =================
+const ImageDb = {
+  dbName: 'OuchiGohanImagesDB',
+  storeName: 'meal_images',
+  version: 1,
+  _db: null,
+
+  async getDb() {
+    if (this._db) return this._db;
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.dbName, this.version);
+      request.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(this.storeName)) {
+          db.createObjectStore(this.storeName, { keyPath: 'id' });
+        }
+      };
+      request.onsuccess = (e) => {
+        this._db = e.target.result;
+        resolve(this._db);
+      };
+      request.onerror = (e) => reject(e.target.error);
+    });
+  },
+
+  async saveImage(id, dataUrl) {
+    try {
+      const db = await this.getDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(this.storeName, 'readwrite');
+        const store = tx.objectStore(this.storeName);
+        store.put({ id, dataUrl, updatedAt: Date.now() });
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch (err) {
+      console.warn('IndexedDB saveImage failed:', err);
+      return false;
+    }
+  },
+
+  async getImage(id) {
+    try {
+      const db = await this.getDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(this.storeName, 'readonly');
+        const store = tx.objectStore(this.storeName);
+        const request = store.get(id);
+        request.onsuccess = () => resolve(request.result?.dataUrl || null);
+        request.onerror = () => reject(request.error);
+      });
+    } catch (err) {
+      console.warn('IndexedDB getImage failed:', err);
+      return null;
+    }
+  },
+
+  async deleteImage(id) {
+    try {
+      const db = await this.getDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(this.storeName, 'readwrite');
+        const store = tx.objectStore(this.storeName);
+        store.delete(id);
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch (err) {
+      console.warn('IndexedDB deleteImage failed:', err);
+      return false;
+    }
+  }
+};
+
+// Canvas経由での料理写真自動軽量化 (長辺900px, 品質0.8で約60〜90KBに圧縮)
+function compressImage(dataUrl, maxDimension = 900, quality = 0.82) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let width = img.width;
+      let height = img.height;
+      if (width > height) {
+        if (width > maxDimension) {
+          height = Math.round((height * maxDimension) / width);
+          width = maxDimension;
+        }
+      } else {
+        if (height > maxDimension) {
+          width = Math.round((width * maxDimension) / height);
+          height = maxDimension;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // WebPが利用できればWebP、そうでなければJPEG
+      try {
+        const compressed = canvas.toDataURL('image/webp', quality);
+        if (compressed && compressed.startsWith('data:image/webp')) {
+          resolve(compressed);
+          return;
+        }
+      } catch {}
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
 // 家族構成・生年月からの月齢・食事ボリューム自動計算ヘルパー
 const FamilyHelper = {
   // 生年月（YYYY-MM）から現在の年齢・月齢・取り分けステージ・食事係数を自動計算
@@ -1334,14 +1448,44 @@ const Dashboard = {
 };
 
 
-// ================= 4. Nutrition (食事記録 & Life Peak 連携) =================
+// ================= 4. Nutrition (食事記録 & 写真IndexedDB & 5区分・自炊外食対応) =================
 const Nutrition = {
   currentAnalysis: null,
+  currentCompressedImage: null,
   volumeScale: 1.0,
+  selectedMealType: 'lunch',
+  selectedMealSource: 'home',
+
+  // 時刻から食事区分（朝・ブランチ・昼・夕・間食）を自動推測
+  guessMealType(date = new Date()) {
+    const hour = date.getHours();
+    const minutes = date.getMinutes();
+    const timeVal = hour + minutes / 60;
+
+    if (timeVal >= 5.0 && timeVal < 10.0) return 'breakfast'; // 05:00 - 09:59 朝食
+    if (timeVal >= 10.0 && timeVal < 11.5) return 'brunch';    // 10:00 - 11:29 ブランチ (朝昼兼用)
+    if (timeVal >= 11.5 && timeVal < 15.0) return 'lunch';     // 11:30 - 14:59 昼食
+    if (timeVal >= 15.0 && timeVal < 17.5) return 'snack';     // 15:00 - 17:29 間食
+    if (timeVal >= 17.5 && timeVal < 21.5) return 'dinner';    // 17:30 - 21:29 夕食
+    return 'snack'; // 21:30 - 04:59 夜食・間食
+  },
+
+  // 食事区分のラベル & バッジ情報
+  getMealTypeInfo(type) {
+    const map = {
+      breakfast: { label: '朝食', icon: '🌅', color: 'bg-sky-50 text-sky-700 border-sky-200' },
+      brunch:    { label: 'ブランチ', icon: '🥐', color: 'bg-amber-50 text-amber-700 border-amber-200' },
+      lunch:     { label: '昼食', icon: '☀️', color: 'bg-orange-50 text-orange-700 border-orange-200' },
+      dinner:    { label: '夕食', icon: '🌙', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+      snack:     { label: '間食', icon: '☕', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
+    };
+    return map[type] || { label: '食事', icon: '🍽️', color: 'bg-gray-50 text-gray-700 border-gray-200' };
+  },
 
   init() {
     this.bindEvents();
     this.renderLogs();
+    this.initPhotoViewer();
     window.addEventListener('app:logs-updated', () => this.renderLogs());
   },
 
@@ -1355,11 +1499,15 @@ const Nutrition = {
       try {
         const reader = new FileReader();
         reader.onload = async () => {
-          const base64 = reader.result;
-          const result = await ApiClient.analyzeMealImage(base64, file.type);
+          const rawBase64 = reader.result;
+          // Canvasによる軽量圧縮（長辺900px, 80KB程度）
+          const compressed = await compressImage(rawBase64, 900, 0.82);
+          this.currentCompressedImage = compressed;
+
+          const result = await ApiClient.analyzeMealImage(compressed, file.type || 'image/jpeg');
           this.currentAnalysis = result;
           this.volumeScale = 1.0;
-          this.renderAnalysisModal(result, base64);
+          this.renderAnalysisModal(result, compressed);
           if (spinner) spinner.classList.add('hidden');
         };
         reader.readAsDataURL(file);
@@ -1387,39 +1535,143 @@ const Nutrition = {
     }
   },
 
-  renderLogs() {
+  initPhotoViewer() {
+    const modal = document.getElementById('meal-photo-viewer-modal');
+    const closeBtn = document.getElementById('meal-photo-viewer-close-btn');
+    if (!modal) return;
+
+    if (closeBtn) closeBtn.onclick = () => modal.classList.add('hidden');
+    modal.onclick = (e) => {
+      if (e.target === modal) modal.classList.add('hidden');
+    };
+  },
+
+  async openPhotoViewer(logId, title, meta) {
+    const modal = document.getElementById('meal-photo-viewer-modal');
+    const img = document.getElementById('meal-photo-viewer-img');
+    const titleEl = document.getElementById('meal-photo-viewer-title');
+    const metaEl = document.getElementById('meal-photo-viewer-meta');
+    if (!modal || !img) return;
+
+    // IndexedDBから高解像度写真を取得
+    const dataUrl = await ImageDb.getImage(logId);
+    if (!dataUrl) {
+      if (window.showToast) window.showToast('写真データが見つかりませんでした', '📷');
+      return;
+    }
+
+    img.src = dataUrl;
+    if (titleEl) titleEl.textContent = title || '料理写真';
+    if (metaEl) metaEl.textContent = meta || '';
+    modal.classList.remove('hidden');
+  },
+
+  async renderLogs() {
     const container = document.getElementById('nutrition-logs-container');
     if (!container) return;
 
     const logs = Store.getMealLogs();
     if (!logs || logs.length === 0) {
-      container.innerHTML = `<p class="text-xs text-center text-gray-400 py-6">食事ログはまだありません。「写真を解析」から記録してください</p>`;
+      container.innerHTML = `<p class="text-xs text-center text-gray-400 py-6">食事ログはまだありません。「📷 撮影」または「🖼️ 写真選択」から記録してください</p>`;
       return;
     }
 
-    container.innerHTML = logs.map(log => `
-      <div class="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between text-xs shadow-xs">
-        <div>
-          <div class="font-bold text-gray-800 text-sm">${log.dishName}</div>
-          <div class="text-[10px] text-gray-400 mt-0.5">
-            ${new Date(log.loggedAt).toLocaleDateString()} ${new Date(log.loggedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • ボリューム ${Math.round((log.scale || 1) * 100)}%
-          </div>
-          <div class="text-[10px] text-gray-500 mt-0.5">
-            たんぱく質:${log.protein}g / 脂質:${log.fat}g / 炭水化物:${log.carbs}g
-          </div>
-        </div>
-        <div class="text-right flex flex-col items-end space-y-1">
-          <span class="font-black text-orange-600 text-sm">${log.calories} kcal</span>
-          <button data-del-log="${log.id}" class="text-[11px] text-gray-400 hover:text-rose-500">削除</button>
-        </div>
-      </div>
-    `).join('');
+    // 新しい順（降順）にソート
+    const sortedLogs = [...logs].sort((a, b) => new Date(b.loggedAt) - new Date(a.loggedAt));
 
-    container.querySelectorAll('[data-del-log]').forEach(btn => {
-      btn.onclick = () => {
-        if (confirm('この食事ログを削除しますか？')) {
-          Store.deleteMealLog(btn.dataset.delLog);
+    container.innerHTML = sortedLogs.map(log => {
+      const typeInfo = this.getMealTypeInfo(log.mealType || this.guessMealType(new Date(log.loggedAt)));
+      const dt = new Date(log.loggedAt);
+      const dateStr = getLocalDateStr(dt).replace(/-/g, '/');
+      const timeStr = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const sourceBadge = log.mealSource === 'out'
+        ? '<span class="text-[9px] px-1.5 py-0.2 rounded-md font-bold bg-purple-50 text-purple-700 border border-purple-200">🚗 外食・旅</span>'
+        : '<span class="text-[9px] px-1.5 py-0.2 rounded-md font-bold bg-gray-50 text-gray-600 border border-gray-200">🏠 自炊</span>';
+
+      return `
+        <div class="bg-white p-3 rounded-2xl border border-gray-100 flex items-center justify-between text-xs shadow-2xs hover:border-gray-200 transition-all space-x-3">
+          <!-- 左側: 写真サムネイル (クリックで拡大) -->
+          <div class="shrink-0 cursor-pointer" data-log-thumb="${log.id}" title="タップして写真を拡大">
+            <div id="thumb-container-${log.id}" class="w-13 h-13 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center overflow-hidden text-xl shadow-2xs">
+              <span>🍽️</span>
+            </div>
+          </div>
+
+          <!-- 中央: 料理情報 & 食事区分 & メモ -->
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center space-x-1.5 mb-0.5">
+              <span class="text-[10px] px-1.5 py-0.2 rounded-md font-black border ${typeInfo.color} shrink-0">
+                ${typeInfo.icon} ${typeInfo.label}
+              </span>
+              ${sourceBadge}
+              <span class="text-[10px] text-gray-400 shrink-0 font-medium">${dateStr} ${timeStr}</span>
+            </div>
+
+            <div class="font-black text-gray-800 text-sm truncate flex items-center space-x-1.5">
+              <span class="truncate">${log.dishName}</span>
+              <span class="text-[10px] text-gray-400 font-normal shrink-0">(${Math.round((log.scale || 1) * 100)}%)</span>
+            </div>
+
+            ${log.memo ? `
+              <div class="text-[10px] text-amber-800 bg-amber-50/70 border border-amber-200/50 px-2 py-0.5 rounded-lg mt-1 truncate inline-block max-w-full">
+                📝 ${log.memo}
+              </div>
+            ` : ''}
+
+            <div class="text-[10px] text-gray-500 mt-1">
+              P:${log.protein}g / F:${log.fat}g / C:${log.carbs}g
+            </div>
+          </div>
+
+          <!-- 右側: カロリー & 削除ボタン -->
+          <div class="text-right flex flex-col items-end justify-between shrink-0 space-y-2">
+            <span class="font-black text-orange-600 text-sm">${log.calories} <span class="text-[10px] font-normal text-gray-400">kcal</span></span>
+            <button data-del-log="${log.id}" class="text-[11px] text-gray-400 hover:text-rose-500 p-1 active:scale-95" title="削除">🗑️</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // サムネイル画像非同期ロード（IndexedDBから画像があるもののみセット）
+    sortedLogs.forEach(async (log) => {
+      if (!log.hasImage) return;
+      const imgData = await ImageDb.getImage(log.id);
+      if (imgData) {
+        const thumbContainer = document.getElementById(`thumb-container-${log.id}`);
+        if (thumbContainer) {
+          thumbContainer.innerHTML = `<img src="${imgData}" class="w-full h-full object-cover rounded-xl" alt="${log.dishName}">`;
         }
+      }
+    });
+
+    // サムネイルクリックで拡大モーダル表示
+    container.querySelectorAll('[data-log-thumb]').forEach(el => {
+      el.onclick = () => {
+        const id = el.dataset.logThumb;
+        const targetLog = sortedLogs.find(l => l.id === id);
+        if (targetLog) {
+          const typeInfo = this.getMealTypeInfo(targetLog.mealType);
+          const meta = `${typeInfo.icon} ${typeInfo.label} • ${new Date(targetLog.loggedAt).toLocaleDateString()} • ${targetLog.calories} kcal`;
+          this.openPhotoViewer(id, targetLog.dishName, meta);
+        }
+      };
+    });
+
+    // 削除ボタン
+    container.querySelectorAll('[data-del-log]').forEach(btn => {
+      btn.onclick = async () => {
+        const id = btn.dataset.delLog;
+        const targetLog = sortedLogs.find(l => l.id === id);
+        const name = targetLog?.dishName || 'この食事ログ';
+
+        const needConfirm = Store.getSettings().confirmBeforeDelete !== false;
+        if (needConfirm) {
+          if (!confirm(`「${name}」の記録を削除しますか？`)) return;
+        }
+
+        Store.deleteMealLog(id);
+        await ImageDb.deleteImage(id);
+        if (window.showToast) window.showToast(`「${name}」を削除しました`, '🗑️');
       };
     });
   },
@@ -1432,6 +1684,42 @@ const Nutrition = {
     document.getElementById('analysis-image-preview').src = imageUrl;
     document.getElementById('analysis-feedback').textContent = result.feedback;
 
+    // 初期日付のセット (今日)
+    const dateInput = document.getElementById('analysis-date-input');
+    if (dateInput) dateInput.value = getLocalDateStr(new Date());
+
+    // 食事区分の自動推測 & 初期選択
+    const guessedType = this.guessMealType(new Date());
+    this.selectedMealType = guessedType;
+    this.updateMealTypeUI(guessedType);
+
+    // 自炊/外食の初期セット
+    this.selectedMealSource = 'home';
+    this.updateMealSourceUI('home');
+
+    // メモ欄の初期化
+    const memoInput = document.getElementById('analysis-memo-input');
+    if (memoInput) memoInput.value = '';
+
+    // 食事区分セレクターのバインド
+    document.querySelectorAll('.meal-type-btn').forEach(btn => {
+      btn.onclick = () => {
+        const type = btn.dataset.mealType;
+        this.selectedMealType = type;
+        this.updateMealTypeUI(type);
+      };
+    });
+
+    // 自炊 / 外食セレクターのバインド
+    document.querySelectorAll('.meal-source-btn').forEach(btn => {
+      btn.onclick = () => {
+        const source = btn.dataset.mealSource;
+        this.selectedMealSource = source;
+        this.updateMealSourceUI(source);
+      };
+    });
+
+    // 栄養表示のリアルタイム計算
     const updateValues = () => {
       document.getElementById('val-cal').textContent = `${Math.round(result.calories * this.volumeScale)} kcal`;
       document.getElementById('val-p').textContent = `${Math.round(result.protein * this.volumeScale)}g`;
@@ -1440,6 +1728,7 @@ const Nutrition = {
     };
     updateValues();
 
+    // ボリュームスライダー
     const slider = document.getElementById('volume-slider');
     if (slider) {
       slider.value = 1.0;
@@ -1450,22 +1739,71 @@ const Nutrition = {
       };
     }
 
-    document.getElementById('analysis-save-log-btn').onclick = () => {
-      Store.addMealLog({
-        dishName: result.dishName,
-        calories: Math.round(result.calories * this.volumeScale),
-        protein: Math.round(result.protein * this.volumeScale),
-        fat: Math.round(result.fat * this.volumeScale),
-        carbs: Math.round(result.carbs * this.volumeScale),
-        vitamins: Math.round((result.vitamins || 30) * this.volumeScale),
-        scale: this.volumeScale,
-        loggedAt: new Date().toISOString()
-      });
-      modal.classList.add('hidden');
-    };
+    // 保存ボタン
+    const saveBtn = document.getElementById('analysis-save-log-btn');
+    if (saveBtn) {
+      saveBtn.onclick = async () => {
+        const logId = `log_${Date.now()}`;
+        
+        // 選択された日付（YYYY-MM-DD）からISO文字列を構築
+        const chosenDateStr = dateInput?.value || getLocalDateStr(new Date());
+        const now = new Date();
+        const loggedDate = new Date(`${chosenDateStr}T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`);
 
-    document.getElementById('analysis-cancel-btn').onclick = () => modal.classList.add('hidden');
+        const memo = memoInput?.value?.trim() || '';
+
+        // ログ保存
+        Store.addMealLog({
+          id: logId,
+          dishName: result.dishName,
+          calories: Math.round(result.calories * this.volumeScale),
+          protein: Math.round(result.protein * this.volumeScale),
+          fat: Math.round(result.fat * this.volumeScale),
+          carbs: Math.round(result.carbs * this.volumeScale),
+          vitamins: Math.round((result.vitamins || 30) * this.volumeScale),
+          scale: this.volumeScale,
+          mealType: this.selectedMealType,
+          mealSource: this.selectedMealSource,
+          memo: memo,
+          hasImage: !!this.currentCompressedImage,
+          loggedAt: loggedDate.toISOString()
+        });
+
+        // 写真をIndexedDBへ非同期保存（大容量でも安全・超高速）
+        if (this.currentCompressedImage) {
+          await ImageDb.saveImage(logId, this.currentCompressedImage);
+        }
+
+        modal.classList.add('hidden');
+        if (window.showToast) window.showToast(`「${result.dishName}」を食事ログに記録しました！`, '📸');
+      };
+    }
+
+    const cancelBtn = document.getElementById('analysis-cancel-btn');
+    if (cancelBtn) cancelBtn.onclick = () => modal.classList.add('hidden');
     modal.classList.remove('hidden');
+  },
+
+  updateMealTypeUI(selectedType) {
+    document.querySelectorAll('.meal-type-btn').forEach(btn => {
+      const isSelected = btn.dataset.mealType === selectedType;
+      btn.className = `meal-type-btn py-1.5 px-1 rounded-xl border text-[11px] font-bold active:scale-95 transition-all ${
+        isSelected
+          ? 'border-2 border-orange-500 bg-orange-50/80 text-orange-700 shadow-2xs'
+          : 'border-gray-200 bg-white text-gray-600'
+      }`;
+    });
+  },
+
+  updateMealSourceUI(selectedSource) {
+    document.querySelectorAll('.meal-source-btn').forEach(btn => {
+      const isSelected = btn.dataset.mealSource === selectedSource;
+      btn.className = `meal-source-btn px-2.5 py-1 rounded-lg border text-[11px] font-bold active:scale-95 transition-all ${
+        isSelected
+          ? 'border-orange-500 bg-orange-50 text-orange-700 font-black shadow-2xs'
+          : 'border-gray-200 bg-white text-gray-600'
+      }`;
+    });
   }
 };
 
