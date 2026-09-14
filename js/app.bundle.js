@@ -7,8 +7,56 @@ const STORAGE_KEYS = {
   DELICIOUS_RECIPES: 'meal_app_delicious_recipes',
   MEAL_LOGS: 'meal_app_logs',
   API_KEY: 'meal_app_gemini_api_key',
-  CURRENT_RECIPE: 'meal_app_current_recipe'
+  CURRENT_RECIPE: 'meal_app_current_recipe',
+  SEASONINGS: 'meal_app_seasonings'
 };
+
+// 日本の家庭の定番調味料・たれ・粉類プリセット一覧
+const DEFAULT_SEASONINGS = [
+  // 1. 基本 (さしすせそ)
+  { id: 'seas_sugar', name: '砂糖', category: '基本 (さしすせそ)', inStock: true },
+  { id: 'seas_salt', name: '塩', category: '基本 (さしすせそ)', inStock: true },
+  { id: 'seas_vinegar', name: '酢', category: '基本 (さしすせそ)', inStock: true },
+  { id: 'seas_soy_sauce', name: '醤油', category: '基本 (さしすせそ)', inStock: true },
+  { id: 'seas_miso', name: '味噌', category: '基本 (さしすせそ)', inStock: true },
+
+  // 2. 日常の調味料・ソース・たれ
+  { id: 'seas_mirin', name: 'みりん', category: '日常の調味料・ソース', inStock: true },
+  { id: 'seas_sake', name: '料理酒', category: '日常の調味料・ソース', inStock: true },
+  { id: 'seas_oil', name: 'サラダ油', category: '日常の調味料・ソース', inStock: true },
+  { id: 'seas_sesame_oil', name: 'ごま油', category: '日常の調味料・ソース', inStock: true },
+  { id: 'seas_olive_oil', name: 'オリーブオイル', category: '日常の調味料・ソース', inStock: true },
+  { id: 'seas_mayo', name: 'マヨネーズ', category: '日常の調味料・ソース', inStock: true },
+  { id: 'seas_ketchup', name: 'ケチャップ', category: '日常の調味料・ソース', inStock: true },
+  { id: 'seas_mentsuyu', name: 'めんつゆ', category: '日常の調味料・ソース', inStock: true },
+  { id: 'seas_ponzu', name: 'ぽん酢', category: '日常の調味料・ソース', inStock: true },
+  { id: 'seas_worcester_sauce', name: '中濃ソース / ウスターソース', category: '日常の調味料・ソース', inStock: true },
+  { id: 'seas_okonomi_sauce', name: 'お好みソース / たこ焼きソース', category: '日常の調味料・ソース', inStock: true },
+
+  // 3. 粉類・衣 (調理用粉)
+  { id: 'seas_flour', name: '小麦粉 (薄力粉)', category: '粉類・衣', inStock: true },
+  { id: 'seas_katakuriko', name: '片栗粉', category: '粉類・衣', inStock: true },
+  { id: 'seas_breadcrumbs', name: 'パン粉', category: '粉類・衣', inStock: true },
+  { id: 'seas_tempura_flour', name: '天ぷら粉 / お好み焼き粉', category: '粉類・衣', inStock: false },
+
+  // 4. だし・スープの素
+  { id: 'seas_dashi', name: '和風顆粒だし', category: 'だし・スープの素', inStock: true },
+  { id: 'seas_chicken_soup', name: '鶏ガラスープの素', category: 'だし・スープの素', inStock: true },
+  { id: 'seas_consomme', name: 'コンソメ (固形・顆粒)', category: 'だし・スープの素', inStock: true },
+
+  // 5. 薬味・チューブ
+  { id: 'seas_ginger', name: 'おろし生姜', category: '薬味・チューブ', inStock: true },
+  { id: 'seas_garlic', name: 'おろしにんにく', category: '薬味・チューブ', inStock: true },
+  { id: 'seas_wasabi', name: 'わさび', category: '薬味・チューブ', inStock: true },
+  { id: 'seas_karashi', name: 'からし', category: '薬味・チューブ', inStock: false },
+
+  // 6. 中華・スパイス
+  { id: 'seas_oyster_sauce', name: 'オイスターソース', category: '中華・スパイス', inStock: false },
+  { id: 'seas_doubanjiang', name: '豆板醤', category: '中華・スパイス', inStock: false },
+  { id: 'seas_gochujang', name: 'コチュジャン', category: '中華・スパイス', inStock: false },
+  { id: 'seas_curry_powder', name: 'カレー粉 / ルー', category: '中華・スパイス', inStock: false },
+  { id: 'seas_pepper', name: '塩コショウ / 黒コショウ', category: '中華・スパイス', inStock: true }
+];
 
 const DEFAULT_SETTINGS = {
   theme: 'orange',
@@ -543,6 +591,62 @@ const Store = {
     ];
   },
 
+  // --- 調味料・粉類 (Seasonings) ---
+  getSeasonings() {
+    const raw = localStorage.getItem(STORAGE_KEYS.SEASONINGS);
+    if (!raw) {
+      this.saveSeasonings(DEFAULT_SEASONINGS);
+      return DEFAULT_SEASONINGS;
+    }
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return DEFAULT_SEASONINGS;
+    }
+  },
+
+  saveSeasonings(list) {
+    localStorage.setItem(STORAGE_KEYS.SEASONINGS, JSON.stringify(list));
+    window.dispatchEvent(new CustomEvent('app:seasonings-updated', { detail: list }));
+  },
+
+  toggleSeasoning(id) {
+    const list = this.getSeasonings();
+    const target = list.find(s => s.id === id);
+    if (target) {
+      target.inStock = !target.inStock;
+      this.saveSeasonings(list);
+    }
+  },
+
+  addCustomSeasoning(name, category = '中華・スパイス') {
+    if (!name || !name.trim()) return null;
+    const list = this.getSeasonings();
+    const cleanName = name.trim();
+    if (list.some(s => s.name === cleanName)) {
+      alert(`「${cleanName}」は既に登録されています`);
+      return null;
+    }
+    const newItem = {
+      id: 'seas_' + Date.now(),
+      name: cleanName,
+      category: category,
+      inStock: true
+    };
+    list.push(newItem);
+    this.saveSeasonings(list);
+    return newItem;
+  },
+
+  deleteSeasoning(id) {
+    const list = this.getSeasonings().filter(s => s.id !== id);
+    this.saveSeasonings(list);
+  },
+
+  getInStockSeasoningNames() {
+    return this.getSeasonings().filter(s => s.inStock).map(s => s.name);
+  },
+
   // Life Peak 連携形式でのデータ書き出し (JSON)
   exportLifePeakFormat() {
     const logs = this.getMealLogs();
@@ -596,6 +700,7 @@ const Store = {
       exportedAt: new Date().toISOString(),
       settings: this.getSettings(),
       inventory: this.getInventory(),
+      seasonings: this.getSeasonings(),
       deliciousRecipes: this.getDeliciousRecipes(),
       mealLogs: this.getMealLogs()
     };
@@ -613,6 +718,7 @@ const Store = {
       const data = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
       if (data.settings) localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(data.settings));
       if (data.inventory) localStorage.setItem(STORAGE_KEYS.INVENTORY, JSON.stringify(data.inventory));
+      if (data.seasonings) localStorage.setItem(STORAGE_KEYS.SEASONINGS, JSON.stringify(data.seasonings));
       if (data.deliciousRecipes) localStorage.setItem(STORAGE_KEYS.DELICIOUS_RECIPES, JSON.stringify(data.deliciousRecipes));
       if (data.mealLogs) localStorage.setItem(STORAGE_KEYS.MEAL_LOGS, JSON.stringify(data.mealLogs));
       window.dispatchEvent(new CustomEvent('app:data-imported'));
@@ -783,6 +889,14 @@ const ApiClient = {
       stapleInstruction = '【重要】主食は作らない設定のため、主食(staple)は提案せず、指定されたおかずのみに集中した手順と材料を出力してください。';
     }
 
+    const inStockSeasonings = Store.getInStockSeasoningNames();
+    const seasoningSection = inStockSeasonings.length > 0
+      ? `【現在家にある調味料・粉類（常備リスト）】
+以下の家庭にある調味料・粉類を優先して味付け・調理してください:
+${inStockSeasonings.join('、')}
+※上記にない特別な調味料（オイスターソース、ナツメグ、スパイス等）や粉類は使わないか、使う場合は「〇〇がない場合は醤油と砂糖で代用可能」などの代替案を調理手順内に必ず明記してください。`
+      : '【調味料】一般的な基本調味料（醤油、みりん、酒、塩、砂糖等）を使用してください。';
+
     const prompt = `あなたは「一度の調理で家族全員分を作る」時短と安全を極めたプロの管理栄養士・AIシェフです。
 手持ちの食材在庫をベースに、大人の健康目的と子どもの月齢に合わせた献立レシピを1セット提案してください。
 
@@ -796,6 +910,8 @@ ${stapleInstruction}
 
 【現在の冷蔵庫の食材】
 ${inventory.map(i => `- ${i.name} (${i.quantity}, 賞味期限目安あと${i.expiryDays}日)`).join('\n')}
+
+${seasoningSection}
 
 【大人の健康目的】
 ${(settings.adultGoals || ['general']).map(g => adultGoalDescriptions[g] || g).join(', ')}
@@ -2997,6 +3113,153 @@ const Inventory = {
         this.render();
       };
     }
+  },
+
+  activeSubtab: 'ingredients',
+
+  initSubtabs() {
+    const btnIng = document.getElementById('inventory-subtab-ingredients');
+    const btnSeas = document.getElementById('inventory-subtab-seasonings');
+    const panelIng = document.getElementById('subpanel-ingredients');
+    const panelSeas = document.getElementById('subpanel-seasonings');
+    const fab = document.getElementById('inventory-fab');
+
+    if (!btnIng || !btnSeas || !panelIng || !panelSeas) return;
+
+    btnIng.onclick = () => {
+      this.activeSubtab = 'ingredients';
+      btnIng.className = 'flex-1 py-2 rounded-xl text-xs font-black theme-primary-bg text-white shadow-xs transition-all flex items-center justify-center space-x-1.5';
+      btnSeas.className = 'flex-1 py-2 rounded-xl text-xs font-bold text-gray-600 hover:text-gray-900 transition-all flex items-center justify-center space-x-1.5';
+      panelIng.classList.remove('hidden');
+      panelSeas.classList.add('hidden');
+      if (fab) fab.classList.remove('hidden');
+    };
+
+    btnSeas.onclick = () => {
+      this.activeSubtab = 'seasonings';
+      btnSeas.className = 'flex-1 py-2 rounded-xl text-xs font-black theme-primary-bg text-white shadow-xs transition-all flex items-center justify-center space-x-1.5';
+      btnIng.className = 'flex-1 py-2 rounded-xl text-xs font-bold text-gray-600 hover:text-gray-900 transition-all flex items-center justify-center space-x-1.5';
+      panelSeas.classList.remove('hidden');
+      panelIng.classList.add('hidden');
+      if (fab) fab.classList.add('hidden');
+      this.renderSeasonings();
+    };
+
+    this.initCustomSeasoning();
+    window.addEventListener('app:seasonings-updated', () => {
+      if (this.activeSubtab === 'seasonings') this.renderSeasonings();
+    });
+  },
+
+  renderSeasonings() {
+    const container = document.getElementById('seasonings-groups-container');
+    if (!container) return;
+
+    const list = Store.getSeasonings();
+
+    const categoryOrder = [
+      { key: '基本 (さしすせそ)', label: '🍶 基本 (さしすせそ)' },
+      { key: '日常の調味料・ソース', label: '🥢 日常の調味料・ソース・たれ' },
+      { key: '粉類・衣', label: '🌾 粉類・衣 (調理用粉)' },
+      { key: 'だし・スープの素', label: '🍲 だし・スープの素' },
+      { key: '薬味・チューブ', label: '🧄 薬味・チューブ' },
+      { key: '中華・スパイス', label: '🌶️ 中華・スパイス' },
+      { key: 'その他・スパイス', label: '🧂 その他・追加スパイス' }
+    ];
+
+    // グループ化
+    const grouped = {};
+    categoryOrder.forEach(cat => { grouped[cat.key] = []; });
+    list.forEach(item => {
+      const catKey = grouped[item.category] ? item.category : 'その他・スパイス';
+      grouped[catKey].push(item);
+    });
+
+    container.innerHTML = categoryOrder.map(cat => {
+      const items = grouped[cat.key];
+      if (!items || items.length === 0) return '';
+
+      const inStockCount = items.filter(i => i.inStock).length;
+
+      return `
+        <div class="bg-white p-3.5 rounded-2xl border border-gray-100 shadow-2xs space-y-2.5">
+          <div class="flex items-center justify-between border-b border-gray-100 pb-1.5">
+            <h5 class="font-black text-xs text-gray-800 flex items-center space-x-1">
+              <span>${cat.label}</span>
+            </h5>
+            <span class="text-[10px] font-bold text-gray-400">常備: ${inStockCount}/${items.length}</span>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+            ${items.map(item => `
+              <div data-seas-btn="${item.id}" class="p-2.5 rounded-xl border cursor-pointer select-none transition-all flex items-center justify-between ${
+                item.inStock
+                  ? 'border-2 border-emerald-500 bg-emerald-50/70 text-emerald-800 shadow-2xs'
+                  : 'border border-gray-200 bg-gray-50/50 text-gray-400 hover:border-gray-300'
+              }">
+                <div class="flex items-center space-x-1.5 min-w-0 flex-1">
+                  <span class="text-xs font-black shrink-0 ${item.inStock ? 'text-emerald-600' : 'text-gray-300'}">
+                    ${item.inStock ? '✓' : '＋'}
+                  </span>
+                  <span class="font-bold text-[11px] truncate ${item.inStock ? 'text-gray-800 font-black' : 'text-gray-500'}">
+                    ${item.name}
+                  </span>
+                </div>
+
+                ${item.id.startsWith('seas_1') ? `
+                  <button type="button" data-del-seas="${item.id}" class="text-gray-300 hover:text-rose-500 text-xs p-0.5 ml-1 shrink-0" title="削除">✕</button>
+                ` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // 調味料トグルクリックイベント
+    container.querySelectorAll('[data-seas-btn]').forEach(card => {
+      card.onclick = () => {
+        const id = card.dataset.seasBtn;
+        Store.toggleSeasoning(id);
+        this.renderSeasonings();
+      };
+    });
+
+    // カスタム調味料削除イベント (イベント伝播停止)
+    container.querySelectorAll('[data-del-seas]').forEach(btn => {
+      btn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const id = btn.dataset.delSeas;
+        Store.deleteSeasoning(id);
+        this.renderSeasonings();
+      };
+    });
+  },
+
+  initCustomSeasoning() {
+    const input = document.getElementById('custom-seasoning-input');
+    const addBtn = document.getElementById('btn-add-custom-seasoning');
+    if (!input || !addBtn) return;
+
+    const doAdd = () => {
+      const name = input.value.trim();
+      if (!name) return;
+      const res = Store.addCustomSeasoning(name, 'その他・スパイス');
+      if (res) {
+        input.value = '';
+        if (window.showToast) window.showToast(`「${name}」を調味料に追加しました`, '🧂');
+        this.renderSeasonings();
+      }
+    };
+
+    addBtn.onclick = doAdd;
+    input.onkeydown = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        doAdd();
+      }
+    };
   }
 };
 
@@ -3118,6 +3381,7 @@ const App = {
     Ocr.init();
     Recipe.init();
     Inventory.render();
+    Inventory.initSubtabs();
 
     // リロード時は直前に開いていたタブを復元、初回アクセス時は設定の初期タブ（分析/ダッシュボード）を開く
     const hashTab = window.location.hash ? window.location.hash.replace('#', '') : null;

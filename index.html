@@ -82,33 +82,75 @@
     <!-- メインコンテンツ領域 -->
     <main class="flex-1 px-4 py-3 overflow-y-auto">
 
-      <!-- ================= タブ 1: 食材在庫 & レシート ================= -->
-      <section id="tab-panel-inventory" class="tab-panel hidden animate-fade-in space-y-4">
-        <!-- レシート読み取りバナー -->
-        <div class="p-4 rounded-2xl bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-100 flex items-center justify-between shadow-xs">
-          <div class="pr-3">
-            <h3 class="font-bold text-gray-800 text-sm">📸 レシートで一括登録</h3>
-            <p class="text-xs text-gray-500 mt-0.5">AIが食品のみを自動抽出して在庫化</p>
-          </div>
-          <label class="cursor-pointer px-4 py-2.5 rounded-xl font-bold text-xs text-white theme-primary-bg shadow-sm active:scale-95 transition-all shrink-0">
-            レシート撮影
-            <input type="file" id="receipt-file-input" accept="image/*" capture="environment" class="hidden">
-          </label>
-        </div>
-
-        <!-- 手持ち食材リストヘッダー -->
-        <div class="flex items-center justify-between pt-1">
-          <h2 class="font-bold text-gray-800 text-sm flex items-center space-x-1.5">
-            <span>🥗 冷蔵庫の在庫</span>
-          </h2>
-          <button id="open-manual-add-btn" class="text-xs font-semibold theme-primary-text flex items-center space-x-0.5 hover:underline">
-            <span>＋ 手動で追加</span>
+      <!-- ================= タブ 1: 食材在庫 & 調味料 ================= -->
+      <section id="tab-panel-inventory" class="tab-panel hidden animate-fade-in space-y-3">
+        <!-- 食材 / 調味料 切替サブタブ -->
+        <div class="flex p-1 bg-gray-100/90 rounded-2xl border border-gray-200/50">
+          <button type="button" id="inventory-subtab-ingredients" class="flex-1 py-2 rounded-xl text-xs font-black theme-primary-bg text-white shadow-xs transition-all flex items-center justify-center space-x-1.5">
+            <span>🥦</span>
+            <span>食材 (生鮮・日配)</span>
+          </button>
+          <button type="button" id="inventory-subtab-seasonings" class="flex-1 py-2 rounded-xl text-xs font-bold text-gray-600 hover:text-gray-900 transition-all flex items-center justify-center space-x-1.5">
+            <span>🧂</span>
+            <span>調味料・粉類</span>
           </button>
         </div>
 
-        <!-- 食材カード一覧コンテナ -->
-        <div id="inventory-list-container">
-          <!-- inventory.js から動的レンダリング -->
+        <!-- 1. 食材パネル (生鮮・日配) -->
+        <div id="subpanel-ingredients" class="space-y-3">
+          <!-- レシート読み取りバナー -->
+          <div class="p-4 rounded-2xl bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-100 flex items-center justify-between shadow-xs">
+            <div class="pr-3">
+              <h3 class="font-bold text-gray-800 text-sm">📸 レシートで一括登録</h3>
+              <p class="text-xs text-gray-500 mt-0.5">AIが食品のみを自動抽出して在庫化</p>
+            </div>
+            <label class="cursor-pointer px-4 py-2.5 rounded-xl font-bold text-xs text-white theme-primary-bg shadow-sm active:scale-95 transition-all shrink-0">
+              レシート撮影
+              <input type="file" id="receipt-file-input" accept="image/*" capture="environment" class="hidden">
+            </label>
+          </div>
+
+          <!-- 手持ち食材リストヘッダー -->
+          <div class="flex items-center justify-between pt-1">
+            <h2 class="font-bold text-gray-800 text-sm flex items-center space-x-1.5">
+              <span>🥗 冷蔵庫の在庫</span>
+            </h2>
+            <button id="open-manual-add-btn" class="text-xs font-semibold theme-primary-text flex items-center space-x-0.5 hover:underline">
+              <span>＋ 手動で追加</span>
+            </button>
+          </div>
+
+          <!-- 食材カード一覧コンテナ -->
+          <div id="inventory-list-container">
+            <!-- inventory.js から動的レンダリング -->
+          </div>
+        </div>
+
+        <!-- 2. 調味料・粉類パネル (ワンタップ常備/なし切替) -->
+        <div id="subpanel-seasonings" class="hidden space-y-3 animate-fade-in">
+          <div class="p-3 bg-emerald-50/80 rounded-2xl border border-emerald-100 flex items-start justify-between">
+            <div>
+              <h4 class="font-black text-gray-800 text-xs flex items-center space-x-1">
+                <span>🧂 家にある調味料・粉類を登録</span>
+              </h4>
+              <p class="text-[11px] text-gray-600 mt-0.5 leading-relaxed">
+                タップして「ある (常備)」をONにすると、<strong>家にある調味料だけで作れる献立</strong>を優先して提案します。
+              </p>
+            </div>
+          </div>
+
+          <!-- カスタム調味料のクイック追加フォーム -->
+          <div class="p-2.5 bg-white rounded-2xl border border-gray-100 shadow-2xs flex items-center space-x-2">
+            <input type="text" id="custom-seasoning-input" placeholder="＋ 調味料・スパイスを追加 (例: ナツメグ、白だし)" class="flex-1 text-xs px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500 text-gray-800">
+            <button type="button" id="btn-add-custom-seasoning" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs active:scale-95 transition-all shrink-0">
+              追加
+            </button>
+          </div>
+
+          <!-- 調味料グループ一覧コンテナ (JSで動的生成) -->
+          <div id="seasonings-groups-container" class="space-y-3">
+            <!-- app.bundle.js からレンダリング -->
+          </div>
         </div>
       </section>
 
@@ -798,6 +840,6 @@
   </div>
 
   <!-- JavaScript統合バンドル（CORS制限のない完全ローカル対応） -->
-  <script src="js/app.bundle.js?v=20260914_2330"></script>
+  <script src="js/app.bundle.js?v=20260914_2345"></script>
 </body>
 </html>
