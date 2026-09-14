@@ -295,15 +295,23 @@
       <!-- ================= タブ 3: 📝 食事記録 (登録・履歴・Life Peak連携) ================= -->
       <section id="tab-panel-nutrition" class="tab-panel hidden animate-fade-in space-y-3">
         <!-- 撮影アクションバー -->
-        <div class="p-4 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-100 flex items-center justify-between shadow-xs">
+        <div class="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-100 flex items-center justify-between shadow-xs">
           <div>
             <h4 class="font-bold text-gray-800 text-sm">📸 食事写真から自動解析</h4>
-            <p class="text-xs text-gray-500 mt-0.5">カロリー・PFCをAIが推計して記録</p>
+            <p class="text-xs text-gray-500 mt-0.5">カメラ撮影、または保存済み写真から解析</p>
           </div>
-          <label class="cursor-pointer px-4 py-2.5 rounded-xl font-bold text-xs text-white theme-primary-bg shadow-xs active:scale-95 transition-all shrink-0">
-            写真を解析
-            <input type="file" id="meal-photo-input" accept="image/*" capture="environment" class="hidden">
-          </label>
+          <div class="flex items-center space-x-1.5 shrink-0">
+            <label class="cursor-pointer px-3 py-2 rounded-xl font-bold text-xs text-white theme-primary-bg shadow-xs active:scale-95 transition-all flex items-center space-x-1" title="カメラを起動して撮影">
+              <span>📷</span>
+              <span>撮影</span>
+              <input type="file" id="meal-photo-camera-input" accept="image/*" capture="environment" class="hidden">
+            </label>
+            <label class="cursor-pointer px-3 py-2 rounded-xl font-bold text-xs text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 shadow-xs active:scale-95 transition-all flex items-center space-x-1" title="写真アルバム・ファイルから選択">
+              <span>🖼️</span>
+              <span>写真選択</span>
+              <input type="file" id="meal-photo-import-input" accept="image/*" class="hidden">
+            </label>
+          </div>
         </div>
 
         <!-- 食事ログ履歴ヘッダー & 記録アプリ連携エクスポートボタン (設定でON時のみ表示) -->
@@ -745,6 +753,6 @@
   </div>
 
   <!-- JavaScript統合バンドル（CORS制限のない完全ローカル対応） -->
-  <script src="js/app.bundle.js?v=20260911_2255"></script>
+  <script src="js/app.bundle.js?v=20260914_2305"></script>
 </body>
 </html>

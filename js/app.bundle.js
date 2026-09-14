@@ -44,6 +44,16 @@ window.showToast = function(message, icon = '⭐', duration = 2400) {
   }, duration);
 };
 
+// ローカル日付 (YYYY-MM-DD) 取得ヘルパー（UTCとの時差・日付ズレを防止）
+function getLocalDateStr(dateInput = new Date()) {
+  const dt = (dateInput instanceof Date) ? dateInput : new Date(dateInput);
+  if (isNaN(dt.getTime())) return '';
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const d = String(dt.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 // 家族構成・生年月からの月齢・食事ボリューム自動計算ヘルパー
 const FamilyHelper = {
   // 生年月（YYYY-MM）から現在の年齢・月齢・取り分けステージ・食事係数を自動計算
@@ -435,7 +445,7 @@ const Store = {
       },
       // 日付ごとにEntryをまとめたコンテナ形式
       dailyLogs: logs.reduce((acc, log) => {
-        const dateStr = log.loggedAt.slice(0, 10);
+        const dateStr = getLocalDateStr(log.loggedAt);
         if (!acc[dateStr]) acc[dateStr] = { date: dateStr, entries: [] };
         acc[dateStr].entries.push({
           entryId: log.id,
@@ -460,7 +470,7 @@ const Store = {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `LifePeak_MealSync_${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `LifePeak_MealSync_${getLocalDateStr()}.json`;
     a.click();
     URL.revokeObjectURL(url);
     alert('Life Peak連携用のJSONファイルを出力しました！');
@@ -479,7 +489,7 @@ const Store = {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `meal_app_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `meal_app_backup_${getLocalDateStr()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   },
@@ -1230,9 +1240,9 @@ const Dashboard = {
     const primaryGoal = settings.adultGoals?.[0] || 'general';
     const target = NUTRITION_TARGETS[primaryGoal] || NUTRITION_TARGETS.general;
 
-    // 日付ラベルの更新
-    const dateStr = this.selectedDate.toISOString().slice(0, 10);
-    const todayStr = new Date().toISOString().slice(0, 10);
+    // 日付ラベルの更新 (ローカル日付基準でUTCとの時差ズレを解消)
+    const dateStr = getLocalDateStr(this.selectedDate);
+    const todayStr = getLocalDateStr(new Date());
     const isToday = dateStr === todayStr;
 
     const dateLabel = document.getElementById('dash-current-date-label');
@@ -1240,8 +1250,8 @@ const Dashboard = {
       dateLabel.textContent = `${this.selectedDate.getFullYear()}/${(this.selectedDate.getMonth() + 1).toString().padStart(2, '0')}/${this.selectedDate.getDate().toString().padStart(2, '0')} ${isToday ? '(今日)' : ''}`;
     }
 
-    // 選択された日付のログのみを集計
-    const logs = Store.getMealLogs().filter(l => l.loggedAt && l.loggedAt.slice(0, 10) === dateStr);
+    // 選択された日付のログのみを集計（ローカル時間の日付で照合）
+    const logs = Store.getMealLogs().filter(l => l.loggedAt && getLocalDateStr(l.loggedAt) === dateStr);
     let curCal = 0, curP = 0, curF = 0, curC = 0, curV = 0;
     logs.forEach(log => {
       curCal += log.calories || 0;
@@ -1336,33 +1346,39 @@ const Nutrition = {
   },
 
   bindEvents() {
-    const fileInput = document.getElementById('meal-photo-input');
-    if (fileInput) {
-      fileInput.addEventListener('change', async (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+    const handleImageFile = async (file, inputEl) => {
+      if (!file) return;
 
-        const spinner = document.getElementById('global-loading');
-        if (spinner) spinner.classList.remove('hidden');
+      const spinner = document.getElementById('global-loading');
+      if (spinner) spinner.classList.remove('hidden');
 
-        try {
-          const reader = new FileReader();
-          reader.onload = async () => {
-            const base64 = reader.result;
-            const result = await ApiClient.analyzeMealImage(base64, file.type);
-            this.currentAnalysis = result;
-            this.volumeScale = 1.0;
-            this.renderAnalysisModal(result, base64);
-            if (spinner) spinner.classList.add('hidden');
-          };
-          reader.readAsDataURL(file);
-        } catch (err) {
-          alert('解析エラー: ' + err.message);
+      try {
+        const reader = new FileReader();
+        reader.onload = async () => {
+          const base64 = reader.result;
+          const result = await ApiClient.analyzeMealImage(base64, file.type);
+          this.currentAnalysis = result;
+          this.volumeScale = 1.0;
+          this.renderAnalysisModal(result, base64);
           if (spinner) spinner.classList.add('hidden');
-        }
-        fileInput.value = '';
-      });
-    }
+        };
+        reader.readAsDataURL(file);
+      } catch (err) {
+        alert('解析エラー: ' + err.message);
+        if (spinner) spinner.classList.add('hidden');
+      }
+      if (inputEl) inputEl.value = '';
+    };
+
+    ['meal-photo-camera-input', 'meal-photo-import-input', 'meal-photo-input'].forEach(id => {
+      const inputEl = document.getElementById(id);
+      if (inputEl) {
+        inputEl.addEventListener('change', (e) => {
+          const file = e.target.files?.[0];
+          handleImageFile(file, inputEl);
+        });
+      }
+    });
 
     // Life Peak 連携ボタン
     const exportBtn = document.getElementById('btn-export-life-peak');
