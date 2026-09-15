@@ -742,14 +742,35 @@
       </div>
     </div>
 
-    <!-- 写真拡大プレビューモーダル -->
-    <div id="meal-photo-viewer-modal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
-      <div class="relative max-w-lg w-full bg-transparent flex flex-col items-center animate-fade-in space-y-3">
-        <button id="meal-photo-viewer-close-btn" class="absolute -top-10 right-0 text-white text-2xl font-black p-1 hover:text-gray-300">&times; 閉じる</button>
-        <img id="meal-photo-viewer-img" src="" alt="料理写真拡大" class="max-h-[75vh] w-auto max-w-full rounded-2xl shadow-2xl object-contain bg-black">
-        <div class="text-white text-center bg-black/50 px-4 py-2 rounded-xl backdrop-blur-xs">
-          <p id="meal-photo-viewer-title" class="font-black text-sm"></p>
-          <p id="meal-photo-viewer-meta" class="text-xs text-gray-300 mt-0.5"></p>
+    <!-- 写真拡大プレビューモーダル (左右スワイプ & 前後ナビゲーション対応) -->
+    <div id="meal-photo-viewer-modal" class="hidden fixed inset-0 z-50 bg-black/85 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 select-none">
+      <div class="relative max-w-lg w-full bg-transparent flex flex-col items-center animate-fade-in space-y-2.5">
+        <!-- 上部バー: カウンター & 閉じるボタン -->
+        <div class="w-full flex items-center justify-between px-2 text-white text-xs">
+          <span id="meal-photo-viewer-counter" class="bg-white/20 px-2.5 py-1 rounded-full font-bold text-[11px] backdrop-blur-xs">1 / 1</span>
+          <span class="text-gray-300 text-[10px] hidden sm:inline">↔ 左右スワイプで前後の写真</span>
+          <button id="meal-photo-viewer-close-btn" class="text-white text-xl font-black p-1 hover:text-gray-300 bg-white/20 w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-xs">&times;</button>
+        </div>
+
+        <!-- 写真表示コンテナ (スワイプ対象エリア) -->
+        <div id="meal-photo-swipe-area" class="relative w-full flex items-center justify-center overflow-hidden touch-pan-y">
+          <!-- 前の写真ボタン (左) -->
+          <button type="button" id="meal-photo-prev-btn" class="absolute left-2 z-10 w-9 h-9 rounded-full bg-black/50 hover:bg-black/70 text-white font-bold text-base flex items-center justify-center backdrop-blur-xs active:scale-95 transition-all shadow-md">
+            ◀
+          </button>
+
+          <img id="meal-photo-viewer-img" src="" alt="料理写真拡大" class="max-h-[68vh] w-auto max-w-full rounded-2xl shadow-2xl object-contain bg-black transition-transform duration-200">
+
+          <!-- 次の写真ボタン (右) -->
+          <button type="button" id="meal-photo-next-btn" class="absolute right-2 z-10 w-9 h-9 rounded-full bg-black/50 hover:bg-black/70 text-white font-bold text-base flex items-center justify-center backdrop-blur-xs active:scale-95 transition-all shadow-md">
+            ▶
+          </button>
+        </div>
+
+        <!-- 下部情報バー -->
+        <div class="w-full text-white text-center bg-black/60 px-4 py-2.5 rounded-2xl backdrop-blur-xs space-y-0.5">
+          <p id="meal-photo-viewer-title" class="font-black text-sm truncate"></p>
+          <p id="meal-photo-viewer-meta" class="text-xs text-gray-300"></p>
         </div>
       </div>
     </div>
@@ -840,6 +861,6 @@
   </div>
 
   <!-- JavaScript統合バンドル（CORS制限のない完全ローカル対応） -->
-  <script src="js/app.bundle.js?v=20260914_2345"></script>
+  <script src="js/app.bundle.js?v=20260915_2300"></script>
 </body>
 </html>

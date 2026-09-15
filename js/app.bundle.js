@@ -1651,35 +1651,147 @@ const Nutrition = {
     }
   },
 
+  viewerLogs: [],
+  viewerIndex: 0,
+
   initPhotoViewer() {
     const modal = document.getElementById('meal-photo-viewer-modal');
     const closeBtn = document.getElementById('meal-photo-viewer-close-btn');
+    const prevBtn = document.getElementById('meal-photo-prev-btn');
+    const nextBtn = document.getElementById('meal-photo-next-btn');
+    const swipeArea = document.getElementById('meal-photo-swipe-area');
     if (!modal) return;
 
     if (closeBtn) closeBtn.onclick = () => modal.classList.add('hidden');
     modal.onclick = (e) => {
       if (e.target === modal) modal.classList.add('hidden');
     };
+
+    // 左右ボタンでのナビゲーション
+    if (prevBtn) {
+      prevBtn.onclick = (e) => {
+        e.stopPropagation();
+        this.stepViewerPhoto(-1);
+      };
+    }
+    if (nextBtn) {
+      nextBtn.onclick = (e) => {
+        e.stopPropagation();
+        this.stepViewerPhoto(1);
+      };
+    }
+
+    // タッチスワイプ検出 (左右スワイプで前後の写真を表示)
+    if (swipeArea) {
+      let touchStartX = 0;
+      let touchStartY = 0;
+
+      swipeArea.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+        touchStartY = e.changedTouches[0].screenY;
+      }, { passive: true });
+
+      swipeArea.addEventListener('touchend', (e) => {
+        const touchEndX = e.changedTouches[0].screenX;
+        const touchEndY = e.changedTouches[0].screenY;
+        const deltaX = touchEndX - touchStartX;
+        const deltaY = touchEndY - touchStartY;
+
+        // 水平方向のスワイプが垂直方向より大きく、かつ一定距離以上の場合
+        if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 40) {
+          if (deltaX < 0) {
+            // 左スワイプ: 次の写真へ
+            this.stepViewerPhoto(1);
+          } else {
+            // 右スワイプ: 前の写真へ
+            this.stepViewerPhoto(-1);
+          }
+        }
+      }, { passive: true });
+    }
+
+    // キーボードの矢印キー対応 (Escapeで閉じる, ArrowLeftで前へ, ArrowRightで次へ)
+    window.addEventListener('keydown', (e) => {
+      if (modal.classList.contains('hidden')) return;
+      if (e.key === 'Escape') modal.classList.add('hidden');
+      if (e.key === 'ArrowLeft') this.stepViewerPhoto(-1);
+      if (e.key === 'ArrowRight') this.stepViewerPhoto(1);
+    });
   },
 
-  async openPhotoViewer(logId, title, meta) {
+  async openPhotoViewer(logId) {
     const modal = document.getElementById('meal-photo-viewer-modal');
-    const img = document.getElementById('meal-photo-viewer-img');
-    const titleEl = document.getElementById('meal-photo-viewer-title');
-    const metaEl = document.getElementById('meal-photo-viewer-meta');
-    if (!modal || !img) return;
+    if (!modal) return;
 
-    // IndexedDBから高解像度写真を取得
-    const dataUrl = await ImageDb.getImage(logId);
-    if (!dataUrl) {
-      if (window.showToast) window.showToast('写真データが見つかりませんでした', '📷');
+    // 写真を持つ全ログを抽出（新しい順）
+    const allLogs = Store.getMealLogs().sort((a, b) => new Date(b.loggedAt) - new Date(a.loggedAt));
+    this.viewerLogs = allLogs.filter(l => l.hasImage);
+
+    if (this.viewerLogs.length === 0) {
+      if (window.showToast) window.showToast('写真データがありません', '📷');
       return;
     }
 
-    img.src = dataUrl;
-    if (titleEl) titleEl.textContent = title || '料理写真';
-    if (metaEl) metaEl.textContent = meta || '';
+    // タップされたログのインデックスを探す
+    let targetIdx = this.viewerLogs.findIndex(l => l.id === logId);
+    if (targetIdx < 0) targetIdx = 0;
+    this.viewerIndex = targetIdx;
+
+    await this.showViewerPhoto(this.viewerIndex);
     modal.classList.remove('hidden');
+  },
+
+  stepViewerPhoto(direction) {
+    if (!this.viewerLogs || this.viewerLogs.length === 0) return;
+    const nextIdx = this.viewerIndex + direction;
+    if (nextIdx >= 0 && nextIdx < this.viewerLogs.length) {
+      this.viewerIndex = nextIdx;
+      this.showViewerPhoto(this.viewerIndex);
+    }
+  },
+
+  async showViewerPhoto(index) {
+    const img = document.getElementById('meal-photo-viewer-img');
+    const titleEl = document.getElementById('meal-photo-viewer-title');
+    const metaEl = document.getElementById('meal-photo-viewer-meta');
+    const counterEl = document.getElementById('meal-photo-viewer-counter');
+    const prevBtn = document.getElementById('meal-photo-prev-btn');
+    const nextBtn = document.getElementById('meal-photo-next-btn');
+
+    const log = this.viewerLogs[index];
+    if (!log) return;
+
+    // 前後ボタンの活性・非活性制御
+    if (prevBtn) {
+      prevBtn.style.opacity = (index === 0) ? '0.25' : '1.0';
+      prevBtn.style.pointerEvents = (index === 0) ? 'none' : 'auto';
+    }
+    if (nextBtn) {
+      nextBtn.style.opacity = (index === this.viewerLogs.length - 1) ? '0.25' : '1.0';
+      nextBtn.style.pointerEvents = (index === this.viewerLogs.length - 1) ? 'none' : 'auto';
+    }
+
+    // カウンター更新 (例: 2 / 5)
+    if (counterEl) {
+      counterEl.textContent = `${index + 1} / ${this.viewerLogs.length}`;
+    }
+
+    // テキスト情報更新
+    const typeInfo = this.getMealTypeInfo(log.mealType);
+    const dt = new Date(log.loggedAt);
+    const dateStr = getLocalDateStr(dt).replace(/-/g, '/');
+    const sourceText = log.mealSource === 'out' ? '🚗 外食・旅ごはん' : '🏠 自炊';
+
+    if (titleEl) titleEl.textContent = log.dishName;
+    if (metaEl) {
+      metaEl.textContent = `${typeInfo.icon} ${typeInfo.label} • ${dateStr} • ${sourceText} • ${log.calories} kcal`;
+    }
+
+    // IndexedDBから写真データを取得
+    const dataUrl = await ImageDb.getImage(log.id);
+    if (img && dataUrl) {
+      img.src = dataUrl;
+    }
   },
 
   async renderLogs() {
@@ -1705,10 +1817,10 @@ const Nutrition = {
         : '<span class="text-[9px] px-1.5 py-0.2 rounded-md font-bold bg-gray-50 text-gray-600 border border-gray-200">🏠 自炊</span>';
 
       return `
-        <div data-log-card="${log.id}" class="bg-white p-3 rounded-2xl border border-gray-100 flex items-center justify-between text-xs shadow-2xs hover:border-orange-200 hover:shadow-xs cursor-pointer select-none transition-all space-x-3" title="タップして写真を拡大表示">
-          <!-- 左側: 写真サムネイル -->
+        <div data-log-card="${log.id}" class="bg-white p-2.5 sm:p-3 rounded-2xl border border-gray-100 flex items-center justify-between text-xs shadow-2xs hover:border-orange-200 hover:shadow-xs cursor-pointer select-none transition-all space-x-2.5" title="タップして写真を拡大表示">
+          <!-- 左側: 写真サムネイル (縦横比 1:1、カード高さを変えないコンパクトサイズ) -->
           <div class="shrink-0">
-            <div id="thumb-container-${log.id}" class="w-13 h-13 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center overflow-hidden text-xl shadow-2xs">
+            <div id="thumb-container-${log.id}" class="w-10 h-10 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center overflow-hidden text-base shadow-2xs">
               <span>🍽️</span>
             </div>
           </div>
@@ -1729,13 +1841,13 @@ const Nutrition = {
             </div>
 
             ${log.memo ? `
-              <div class="text-[10px] text-amber-800 bg-amber-50/70 border border-amber-200/50 px-2 py-0.5 rounded-lg mt-1 truncate inline-block max-w-full">
+              <div class="text-[10px] text-amber-800 bg-amber-50/70 border border-amber-200/50 px-2 py-0.5 rounded-lg mt-0.5 truncate inline-block max-w-full">
                 📝 ${log.memo}
               </div>
             ` : ''}
 
             <!-- 栄養素（日本語で分かりやすく明記） -->
-            <div class="text-[10px] text-gray-500 mt-1 flex flex-wrap gap-x-2">
+            <div class="text-[10px] text-gray-500 mt-0.5 flex flex-wrap gap-x-2">
               <span>たんぱく質: <strong class="text-blue-600 font-bold">${log.protein}g</strong></span>
               <span>脂質: <strong class="text-amber-600 font-bold">${log.fat}g</strong></span>
               <span>炭水化物: <strong class="text-purple-600 font-bold">${log.carbs}g</strong></span>
@@ -1743,7 +1855,7 @@ const Nutrition = {
           </div>
 
           <!-- 右側: カロリー & 削除ボタン -->
-          <div class="text-right flex flex-col items-end justify-between shrink-0 space-y-2">
+          <div class="text-right flex flex-col items-end justify-between shrink-0 space-y-1.5">
             <span class="font-black text-orange-600 text-sm">${log.calories} <span class="text-[10px] font-normal text-gray-400">kcal</span></span>
             <button data-del-log="${log.id}" class="text-[11px] text-gray-400 hover:text-rose-500 p-1 active:scale-95" title="削除">🗑️</button>
           </div>
@@ -1767,12 +1879,7 @@ const Nutrition = {
     container.querySelectorAll('[data-log-card]').forEach(card => {
       card.onclick = () => {
         const id = card.dataset.logCard;
-        const targetLog = sortedLogs.find(l => l.id === id);
-        if (targetLog) {
-          const typeInfo = this.getMealTypeInfo(targetLog.mealType);
-          const meta = `${typeInfo.icon} ${typeInfo.label} • ${new Date(targetLog.loggedAt).toLocaleDateString()} • ${targetLog.calories} kcal`;
-          this.openPhotoViewer(id, targetLog.dishName, meta);
-        }
+        this.openPhotoViewer(id);
       };
     });
 
