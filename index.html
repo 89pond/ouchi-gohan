@@ -662,8 +662,12 @@
         <div class="flex-1 overflow-y-auto py-3 space-y-3">
           <img id="analysis-image-preview" class="w-full h-40 object-cover rounded-xl border border-gray-100" src="" alt="料理写真">
           <div>
-            <h4 id="analysis-dish-name" class="font-black text-gray-800 text-lg">料理名</h4>
-            <p id="analysis-feedback" class="text-xs text-gray-500 mt-1 leading-relaxed bg-gray-50 p-2.5 rounded-xl border border-gray-100"></p>
+            <div class="flex items-center justify-between text-[11px] text-gray-400 font-bold mb-1">
+              <span>料理名</span>
+              <span class="text-orange-500 font-normal">✏️ タップして編集できます</span>
+            </div>
+            <input type="text" id="analysis-dish-name" class="w-full font-black text-gray-800 text-lg border-b-2 border-orange-300 focus:border-orange-500 outline-none pb-1 bg-orange-50/30 px-2 rounded-t-lg transition-all" placeholder="料理名を入力">
+            <p id="analysis-feedback" class="text-xs text-gray-500 mt-2 leading-relaxed bg-gray-50 p-2.5 rounded-xl border border-gray-100"></p>
           </div>
 
           <!-- PFC表示カード -->
@@ -768,9 +772,10 @@
         </div>
 
         <!-- 下部情報バー -->
-        <div class="w-full text-white text-center bg-black/60 px-4 py-2.5 rounded-2xl backdrop-blur-xs space-y-0.5">
+        <div class="w-full text-white text-center bg-black/70 px-4 py-2.5 rounded-2xl backdrop-blur-xs space-y-1">
           <p id="meal-photo-viewer-title" class="font-black text-sm truncate"></p>
           <p id="meal-photo-viewer-meta" class="text-xs text-gray-300"></p>
+          <p id="meal-photo-viewer-pfc" class="text-[11px] text-orange-200 font-medium"></p>
         </div>
       </div>
     </div>
@@ -861,6 +866,6 @@
   </div>
 
   <!-- JavaScript統合バンドル（CORS制限のない完全ローカル対応） -->
-  <script src="js/app.bundle.js?v=20260915_2320"></script>
+  <script src="js/app.bundle.js?v=20260915_2350"></script>
 </body>
 </html>
