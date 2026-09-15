@@ -173,6 +173,55 @@ const ImageDb = {
       console.warn('IndexedDB deleteImage failed:', err);
       return false;
     }
+  },
+
+  async getAllImages() {
+    try {
+      const db = await this.getDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(this.storeName, 'readonly');
+        const store = tx.objectStore(this.storeName);
+        const request = store.getAll();
+        request.onsuccess = () => {
+          const list = request.result || [];
+          const map = {};
+          list.forEach(item => {
+            if (item && item.id && item.dataUrl) {
+              map[item.id] = item.dataUrl;
+            }
+          });
+          resolve(map);
+        };
+        request.onerror = () => reject(request.error);
+      });
+    } catch (err) {
+      console.warn('IndexedDB getAllImages failed:', err);
+      return {};
+    }
+  },
+
+  async importImages(imagesMap) {
+    if (!imagesMap || typeof imagesMap !== 'object') return false;
+    const entries = Object.entries(imagesMap);
+    if (entries.length === 0) return true;
+
+    try {
+      const db = await this.getDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(this.storeName, 'readwrite');
+        const store = tx.objectStore(this.storeName);
+        for (const [id, dataUrl] of entries) {
+          if (id && dataUrl) {
+            store.put({ id, dataUrl, updatedAt: Date.now() });
+          }
+        }
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch (err) {
+      console.warn('IndexedDB importImages failed:', err);
+      return false;
+    }
   }
 };
 
@@ -694,26 +743,48 @@ const Store = {
     alert('Life Peak連携用のJSONファイルを出力しました！');
   },
 
-  exportBackup() {
-    const data = {
-      version: 2,
-      exportedAt: new Date().toISOString(),
-      settings: this.getSettings(),
-      inventory: this.getInventory(),
-      seasonings: this.getSeasonings(),
-      deliciousRecipes: this.getDeliciousRecipes(),
-      mealLogs: this.getMealLogs()
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `meal_app_backup_${getLocalDateStr()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+  async exportBackup() {
+    try {
+      const imagesMap = await ImageDb.getAllImages();
+      const imageCount = Object.keys(imagesMap).length;
+
+      const data = {
+        version: 3,
+        exportedAt: new Date().toISOString(),
+        settings: this.getSettings(),
+        inventory: this.getInventory(),
+        seasonings: this.getSeasonings(),
+        deliciousRecipes: this.getDeliciousRecipes(),
+        mealLogs: this.getMealLogs(),
+        images: imagesMap
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `meal_app_backup_${getLocalDateStr()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      
+      const msg = imageCount > 0 
+        ? `バックアップを出力しました（料理写真 ${imageCount}枚 を含む）`
+        : 'バックアップを出力しました！';
+      if (typeof showToast === 'function') {
+        showToast(msg, 'success');
+      } else {
+        alert(msg);
+      }
+    } catch (err) {
+      console.error('Export backup failed:', err);
+      if (typeof showToast === 'function') {
+        showToast('バックアップ出力に失敗しました', 'error');
+      } else {
+        alert('バックアップ出力に失敗しました');
+      }
+    }
   },
 
-  importBackup(jsonData) {
+  async importBackup(jsonData) {
     try {
       const data = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
       if (data.settings) localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(data.settings));
@@ -721,10 +792,32 @@ const Store = {
       if (data.seasonings) localStorage.setItem(STORAGE_KEYS.SEASONINGS, JSON.stringify(data.seasonings));
       if (data.deliciousRecipes) localStorage.setItem(STORAGE_KEYS.DELICIOUS_RECIPES, JSON.stringify(data.deliciousRecipes));
       if (data.mealLogs) localStorage.setItem(STORAGE_KEYS.MEAL_LOGS, JSON.stringify(data.mealLogs));
+      
+      let imageCount = 0;
+      if (data.images && typeof data.images === 'object') {
+        await ImageDb.importImages(data.images);
+        imageCount = Object.keys(data.images).length;
+      }
+      
       window.dispatchEvent(new CustomEvent('app:data-imported'));
-      return { success: true };
+      
+      const msg = imageCount > 0
+        ? `バックアップを復元しました（写真 ${imageCount}枚 復元完了）`
+        : 'バックアップを復元しました！';
+      if (typeof showToast === 'function') {
+        showToast(msg, 'success');
+      } else {
+        alert(msg);
+      }
+      return { success: true, imageCount };
     } catch (err) {
       console.error('Backup import error:', err);
+      const errorMsg = 'バックアップの復元に失敗しました: ' + (err.message || '形式が不正です');
+      if (typeof showToast === 'function') {
+        showToast(errorMsg, 'error');
+      } else {
+        alert(errorMsg);
+      }
       return { success: false, error: err.message };
     }
   },
@@ -3876,14 +3969,37 @@ const App = {
       document.documentElement.setAttribute('data-font-size', e.target.value);
     });
 
-    document.getElementById('export-backup-btn')?.addEventListener('click', () => Store.exportBackup());
-    document.getElementById('import-backup-input')?.addEventListener('change', (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (event) => Store.importBackup(event.target.result);
-      reader.readAsText(file);
-    });
+    const exportBtn = document.getElementById('export-backup-btn');
+    if (exportBtn) {
+      exportBtn.addEventListener('click', async () => {
+        const originalHtml = exportBtn.innerHTML;
+        exportBtn.disabled = true;
+        exportBtn.innerHTML = '⏳ 出力中...';
+        try {
+          await Store.exportBackup();
+        } finally {
+          exportBtn.disabled = false;
+          exportBtn.innerHTML = originalHtml;
+        }
+      });
+    }
+
+    const importInput = document.getElementById('import-backup-input');
+    if (importInput) {
+      importInput.addEventListener('change', async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+          try {
+            await Store.importBackup(event.target.result);
+          } finally {
+            importInput.value = '';
+          }
+        };
+        reader.readAsText(file);
+      });
+    }
   },
 
   openItemEditModal(item = null) {
