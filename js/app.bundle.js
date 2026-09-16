@@ -3133,34 +3133,35 @@ const Inventory = {
 
     container.innerHTML = `
       <div class="space-y-2.5">
-        <!-- 一括操作 ＆ 選択バー (タップしやすいモダンボタン) -->
-        <div class="flex items-center justify-between bg-gray-50 p-2 rounded-xl border border-gray-100 text-xs">
-          <button type="button" id="btn-toggle-select-all" class="flex items-center space-x-1.5 px-2 py-1 rounded-lg bg-white border border-gray-200 font-bold text-gray-700 active:scale-95 shadow-2xs">
-            <span class="w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${isAllSelected ? 'bg-orange-500 text-white font-black' : 'border border-gray-300'}">
+        <!-- 一括操作 ＆ 選択バー (1行ですっきり収まるコンパクト設計) -->
+        <div class="flex items-center justify-between bg-gray-50 p-1.5 sm:p-2 rounded-xl border border-gray-100 text-xs gap-1.5">
+          <button type="button" id="btn-toggle-select-all" class="flex items-center space-x-1 px-2 py-1.5 rounded-lg bg-white border border-gray-200 font-bold text-gray-700 active:scale-95 shadow-2xs shrink-0 text-[11px]">
+            <span class="w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] ${isAllSelected ? 'bg-orange-500 text-white font-black' : 'border border-gray-300'}">
               ${isAllSelected ? '✓' : ''}
             </span>
-            <span>すべて (${selectedCount}/${items.length})</span>
+            <span>すべて (${selectedCount})</span>
           </button>
 
           ${selectedCount > 0 ? `
-            <div class="flex items-center space-x-1 flex-wrap">
-              <button type="button" id="btn-bulk-propose" class="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-xs active:scale-95 shadow-2xs flex items-center space-x-1">
+            <div class="flex items-center space-x-1 shrink-0 flex-nowrap overflow-x-auto no-scrollbar">
+              <button type="button" id="btn-bulk-propose" class="px-2 py-1.5 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-[11px] active:scale-95 shadow-2xs flex items-center space-x-1 shrink-0" title="選択した食材で献立提案">
                 <span>🍳</span>
-                <span>献立提案</span>
+                <span>提案</span>
               </button>
-              <button type="button" id="btn-open-bulk-edit" class="px-2 py-1.5 rounded-lg bg-white text-gray-700 border border-gray-200 font-bold text-xs active:scale-95 shadow-2xs flex items-center space-x-1">
+              <button type="button" id="btn-open-bulk-edit" class="px-2 py-1.5 rounded-lg bg-white text-gray-700 border border-gray-200 font-bold text-[11px] active:scale-95 shadow-2xs flex items-center space-x-1 shrink-0" title="まとめて修正">
                 <span>✏️</span>
                 <span>修正</span>
               </button>
-              <button type="button" id="btn-bulk-consume" class="px-2 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-bold border border-emerald-200 text-xs active:scale-95 shadow-2xs">
+              <button type="button" id="btn-bulk-consume" class="px-2 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-bold border border-emerald-200 text-[11px] active:scale-95 shadow-2xs shrink-0" title="使った">
                 使った
               </button>
-              <button type="button" id="btn-bulk-delete" class="px-2 py-1.5 rounded-lg bg-rose-50 text-rose-700 font-bold border border-rose-200 text-xs active:scale-95 shadow-2xs">
-                削除
+              <button type="button" id="btn-bulk-delete" class="px-2 py-1.5 rounded-lg bg-rose-50 text-rose-700 font-bold border border-rose-200 text-[11px] active:scale-95 shadow-2xs shrink-0 flex items-center space-x-0.5" title="選択した食材を削除">
+                <span>🗑️</span>
+                <span class="hidden sm:inline">削除</span>
               </button>
             </div>
           ` : `
-            <span class="text-[10px] text-gray-400">カードをタップで選択</span>
+            <span class="text-[10px] text-gray-400 shrink-0 pr-1">カードをタップで選択</span>
           `}
         </div>
 
