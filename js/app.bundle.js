@@ -102,6 +102,33 @@ function getLocalDateStr(dateInput = new Date()) {
   return `${y}-${m}-${d}`;
 }
 
+// 食材の賞味期限日 (YYYY-MM-DD) を取得・算出
+function getItemExpiryDateStr(item) {
+  if (!item) return getLocalDateStr(new Date());
+  if (item.expiryDate) return item.expiryDate;
+  // createdAt と expiryDays から算出
+  const created = item.createdAt ? new Date(item.createdAt) : new Date();
+  const days = typeof item.expiryDays === 'number' ? item.expiryDays : 3;
+  const target = new Date(created.getFullYear(), created.getMonth(), created.getDate() + days);
+  return getLocalDateStr(target);
+}
+
+// 食材の「本日時点での残り日数（負数は期限切れ超過日数）」をリアルタイム計算
+function getRemainingDays(item) {
+  if (!item) return 0;
+  const expiryDateStr = getItemExpiryDateStr(item);
+  if (!expiryDateStr) return item.expiryDays ?? 3;
+
+  const todayStr = getLocalDateStr(new Date());
+  const [ty, tm, td] = todayStr.split('-').map(Number);
+  const [ey, em, ed] = expiryDateStr.split('-').map(Number);
+
+  const todayMidnight = new Date(ty, tm - 1, td).getTime();
+  const expiryMidnight = new Date(ey, em - 1, ed).getTime();
+
+  return Math.round((expiryMidnight - todayMidnight) / (1000 * 60 * 60 * 24));
+}
+
 // ================= IndexedDB 画像管理 & 自動圧縮 =================
 const ImageDb = {
   dbName: 'OuchiGohanImagesDB',
@@ -383,13 +410,18 @@ const Store = {
 
   addInventoryItem(item) {
     const list = this.getInventory();
+    const createdIso = item.createdAt || new Date().toISOString();
+    const days = typeof item.expiryDays === 'number' ? item.expiryDays : 3;
+    const expiryDate = item.expiryDate || getItemExpiryDateStr({ createdAt: createdIso, expiryDays: days });
+
     const newItem = {
       id: 'inv_' + Date.now() + '_' + Math.random().toString(36).substring(2, 5),
       name: item.name.trim(),
       category: item.category || 'その他',
       quantity: item.quantity || '1パック',
-      expiryDays: typeof item.expiryDays === 'number' ? item.expiryDays : 3,
-      createdAt: new Date().toISOString()
+      expiryDays: days,
+      expiryDate: expiryDate,
+      createdAt: createdIso
     };
     list.unshift(newItem);
     this.saveInventory(list);
@@ -405,10 +437,21 @@ const Store = {
     const list = this.getInventory();
     const idx = list.findIndex(item => item.id === id);
     if (idx !== -1) {
+      const current = list[idx];
+      let newExpiryDate = updatedFields.expiryDate || current.expiryDate;
+      
+      // もし expiryDays が変更された場合は、本日起点で expiryDate を再計算
+      if (updatedFields.expiryDays !== undefined && typeof updatedFields.expiryDays === 'number') {
+        const today = new Date();
+        const target = new Date(today.getFullYear(), today.getMonth(), today.getDate() + updatedFields.expiryDays);
+        newExpiryDate = getLocalDateStr(target);
+      }
+
       list[idx] = {
-        ...list[idx],
+        ...current,
         ...updatedFields,
-        name: (updatedFields.name !== undefined ? updatedFields.name : list[idx].name).trim()
+        expiryDate: newExpiryDate || getItemExpiryDateStr(current),
+        name: (updatedFields.name !== undefined ? updatedFields.name : current.name).trim()
       };
       this.saveInventory(list);
       return list[idx];
@@ -1002,7 +1045,14 @@ ${stapleInstruction}
 食事タイミング指示: ${mealTimeInstructions[actualMealTime] || mealTimeInstructions.dinner}
 
 【現在の冷蔵庫の食材】
-${inventory.map(i => `- ${i.name} (${i.quantity}, 賞味期限目安あと${i.expiryDays}日)`).join('\n')}
+${inventory.map(i => {
+  const d = getRemainingDays(i);
+  return d < 0
+    ? `- ${i.name} (${i.quantity}, ⚠️消費期限${Math.abs(d)}日超過・必ず中心まで十分に加熱調理すること)`
+    : d === 0
+    ? `- ${i.name} (${i.quantity}, 本日中消費・最優先で使用)`
+    : `- ${i.name} (${i.quantity}, 賞味期限目安あと${d}日)`;
+}).join('\n')}
 
 ${seasoningSection}
 
@@ -2364,7 +2414,19 @@ const Recipe = {
     });
   },
 
-  async generateNewRecipe() {
+  async generateNewRecipe(customInventory = null) {
+    const inventory = customInventory || Store.getInventory();
+
+    // ⚠️ 期限切れ食材がある場合は事前にユーザーへ確認
+    const expiredItems = (inventory || []).filter(i => getRemainingDays(i) < 0);
+    if (expiredItems.length > 0) {
+      const names = expiredItems.map(i => `・${i.name} (${Math.abs(getRemainingDays(i))}日超過)`).join('\n');
+      const msg = `⚠️ 以下の食材は賞味期限・消費期限が切れていますが、献立に使用しますか？\n\n${names}\n\n※ 状態（においや見た目）を確認の上、十分に中心まで加熱調理してください。\n（「キャンセル」を押すと提案を中断します）`;
+      if (!confirm(msg)) {
+        return;
+      }
+    }
+
     const spinner = document.getElementById('global-loading');
     if (spinner) spinner.classList.remove('hidden');
     try {
@@ -2373,7 +2435,7 @@ const Recipe = {
       const stepMode = document.getElementById('recipe-step-mode-select')?.value || Store.getSettings().cookingStepMode || 'combined';
       const servings = document.getElementById('recipe-servings-select')?.value || Store.getSettings().defaultServings || 3;
       this.currentProposal = await ApiClient.generateMealProposal(
-        Store.getInventory(),
+        inventory,
         Store.getSettings(),
         genre,
         stepMode,
@@ -2392,7 +2454,7 @@ const Recipe = {
         const stepMode = document.getElementById('recipe-step-mode-select')?.value || Store.getSettings().cookingStepMode || 'combined';
         const servings = document.getElementById('recipe-servings-select')?.value || Store.getSettings().defaultServings || 3;
         this.currentProposal = ApiClient.mockMealProposal(
-          Store.getInventory(),
+          inventory,
           Store.getSettings(),
           genre,
           stepMode,
@@ -3056,12 +3118,15 @@ const Inventory = {
     const container = document.getElementById('inventory-list-container');
     if (!container) return;
 
-    const items = Store.getInventory();
-    if (!items || items.length === 0) {
+    const rawItems = Store.getInventory();
+    if (!rawItems || rawItems.length === 0) {
       this.selectedIds.clear();
       container.innerHTML = `<p class="text-xs text-center text-gray-400 py-6">食材がありません。「＋」から追加してください</p>`;
       return;
     }
+
+    // 残り日数が少ない（期限切れ含む）順にソート
+    const items = [...rawItems].sort((a, b) => getRemainingDays(a) - getRemainingDays(b));
 
     const selectedCount = this.selectedIds.size;
     const isAllSelected = selectedCount > 0 && selectedCount === items.length;
@@ -3074,20 +3139,24 @@ const Inventory = {
             <span class="w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${isAllSelected ? 'bg-orange-500 text-white font-black' : 'border border-gray-300'}">
               ${isAllSelected ? '✓' : ''}
             </span>
-            <span>すべて選択 (${selectedCount}/${items.length})</span>
+            <span>すべて (${selectedCount}/${items.length})</span>
           </button>
 
           ${selectedCount > 0 ? `
-            <div class="flex items-center space-x-1">
-              <button type="button" id="btn-open-bulk-edit" class="px-2.5 py-1.5 rounded-lg bg-orange-500 text-white font-bold text-xs active:scale-95 shadow-2xs flex items-center space-x-1">
+            <div class="flex items-center space-x-1 flex-wrap">
+              <button type="button" id="btn-bulk-propose" class="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-xs active:scale-95 shadow-2xs flex items-center space-x-1">
+                <span>🍳</span>
+                <span>献立提案</span>
+              </button>
+              <button type="button" id="btn-open-bulk-edit" class="px-2 py-1.5 rounded-lg bg-white text-gray-700 border border-gray-200 font-bold text-xs active:scale-95 shadow-2xs flex items-center space-x-1">
                 <span>✏️</span>
-                <span>まとめて修正</span>
+                <span>修正</span>
               </button>
               <button type="button" id="btn-bulk-consume" class="px-2 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-bold border border-emerald-200 text-xs active:scale-95 shadow-2xs">
-                🍳 使った
+                使った
               </button>
               <button type="button" id="btn-bulk-delete" class="px-2 py-1.5 rounded-lg bg-rose-50 text-rose-700 font-bold border border-rose-200 text-xs active:scale-95 shadow-2xs">
-                🗑️ 削除
+                削除
               </button>
             </div>
           ` : `
@@ -3099,6 +3168,22 @@ const Inventory = {
         <div class="space-y-2">
           ${items.map(item => {
             const isSelected = this.selectedIds.has(item.id);
+            const remDays = getRemainingDays(item);
+
+            // 期限表示バッジの生成
+            let badgeHtml = '';
+            if (remDays < 0) {
+              badgeHtml = `<span class="text-[10px] px-2 py-0.5 rounded-md font-black bg-rose-600 text-white shadow-2xs shrink-0 animate-pulse">⚠️ 期限切れ (${Math.abs(remDays)}日超過)</span>`;
+            } else if (remDays === 0) {
+              badgeHtml = `<span class="text-[10px] px-1.5 py-0.2 rounded-md font-black bg-rose-100 text-rose-700 shrink-0">本日中！</span>`;
+            } else if (remDays === 1) {
+              badgeHtml = `<span class="text-[10px] px-1.5 py-0.2 rounded-md font-bold bg-orange-100 text-orange-700 shrink-0">あと1日！</span>`;
+            } else if (remDays <= 3) {
+              badgeHtml = `<span class="text-[10px] px-1.5 py-0.2 rounded-md font-bold bg-amber-100 text-amber-700 shrink-0">あと${remDays}日</span>`;
+            } else {
+              badgeHtml = `<span class="text-[10px] px-1.5 py-0.2 rounded-md font-bold bg-gray-100 text-gray-600 shrink-0">あと${remDays}日</span>`;
+            }
+
             return `
               <div data-inv-card="${item.id}" class="p-3.5 rounded-2xl cursor-pointer transition-all flex items-center justify-between ${
                 isSelected
@@ -3110,13 +3195,7 @@ const Inventory = {
                   <div class="flex-1 min-w-0">
                     <div class="font-black text-gray-800 text-xs truncate flex items-center space-x-1.5">
                       <span class="truncate">${item.name}</span>
-                      <span class="text-[10px] px-1.5 py-0.2 rounded-md font-bold shrink-0 ${
-                        (item.expiryDays <= 1)
-                          ? 'bg-rose-100 text-rose-700'
-                          : (item.expiryDays <= 3)
-                          ? 'bg-orange-100 text-orange-700'
-                          : 'bg-gray-100 text-gray-600'
-                      }">(あと${item.expiryDays}日)</span>
+                      ${badgeHtml}
                     </div>
                     <div class="text-gray-400 text-[10px] mt-0.5 truncate">${item.category || 'その他'} • 数量: ${item.quantity || '1個'}</div>
                   </div>
@@ -3197,6 +3276,27 @@ const Inventory = {
       };
     });
 
+    // 一括献立提案ボタン
+    const bulkProposeBtn = document.getElementById('btn-bulk-propose');
+    if (bulkProposeBtn) {
+      bulkProposeBtn.onclick = async () => {
+        const count = this.selectedIds.size;
+        if (count === 0) return;
+        const selectedItems = items.filter(i => this.selectedIds.has(i.id));
+
+        // 献立タブに切り替え
+        const recipeTabBtn = document.querySelector('[data-tab-target="recipe"]');
+        if (recipeTabBtn) {
+          recipeTabBtn.click();
+        }
+
+        // 選択された食材のみを優先した提案を生成 (期限切れ食材があれば確認ダイアログが発火)
+        if (window.Recipe?.generateNewRecipe) {
+          await window.Recipe.generateNewRecipe(selectedItems);
+        }
+      };
+    }
+
     // 一括使ったボタン
     const bulkConsumeBtn = document.getElementById('btn-bulk-consume');
     if (bulkConsumeBtn) {
@@ -3272,7 +3372,7 @@ const Inventory = {
               <div>
                 <label class="block text-[9px] font-bold text-gray-400 mb-0.5">期限 (あと何日)</label>
                 <div class="flex items-center space-x-1">
-                  <input type="number" data-bulk-exp="${item.id}" value="${item.expiryDays ?? 3}" min="0" max="60" class="w-full bg-white border border-gray-200 px-1.5 py-1 rounded-lg text-xs font-bold text-gray-700">
+                  <input type="number" data-bulk-exp="${item.id}" value="${Math.max(0, getRemainingDays(item))}" min="0" max="60" class="w-full bg-white border border-gray-200 px-1.5 py-1 rounded-lg text-xs font-bold text-gray-700">
                   <span class="text-[10px] text-gray-400 shrink-0">日</span>
                 </div>
               </div>
@@ -4048,7 +4148,7 @@ const App = {
       if (nameInput) nameInput.value = item.name;
       if (catInput) catInput.value = item.category || '野菜';
       if (qtyInput) qtyInput.value = item.quantity || '1個';
-      if (expInput) expInput.value = item.expiryDays ?? 3;
+      if (expInput) expInput.value = Math.max(0, getRemainingDays(item));
       if (titleEl) titleEl.textContent = '✏️ 食材を編集';
       if (submitBtn) submitBtn.textContent = '変更を保存する';
     } else {
