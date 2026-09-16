@@ -3144,20 +3144,20 @@ const Inventory = {
 
           ${selectedCount > 0 ? `
             <div class="flex items-center space-x-1 shrink-0 flex-nowrap overflow-x-auto no-scrollbar">
-              <button type="button" id="btn-bulk-propose" class="px-2 py-1.5 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-[11px] active:scale-95 shadow-2xs flex items-center space-x-1 shrink-0" title="選択した食材で献立提案">
+              <button type="button" id="btn-bulk-propose" class="px-2 py-1 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-[11px] active:scale-95 shadow-2xs flex items-center space-x-0.5 shrink-0" title="選択した食材で献立提案">
                 <span>🍳</span>
                 <span>提案</span>
               </button>
-              <button type="button" id="btn-open-bulk-edit" class="px-2 py-1.5 rounded-lg bg-white text-gray-700 border border-gray-200 font-bold text-[11px] active:scale-95 shadow-2xs flex items-center space-x-1 shrink-0" title="まとめて修正">
+              <button type="button" id="btn-open-bulk-edit" class="px-2 py-1 rounded-lg bg-white text-gray-700 border border-gray-200 font-bold text-[11px] active:scale-95 shadow-2xs flex items-center space-x-0.5 shrink-0" title="まとめて修正">
                 <span>✏️</span>
                 <span>修正</span>
               </button>
-              <button type="button" id="btn-bulk-consume" class="px-2 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-bold border border-emerald-200 text-[11px] active:scale-95 shadow-2xs shrink-0" title="使った">
+              <button type="button" id="btn-bulk-consume" class="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-bold border border-emerald-200 text-[11px] active:scale-95 shadow-2xs shrink-0" title="使った">
                 使った
               </button>
-              <button type="button" id="btn-bulk-delete" class="px-2 py-1.5 rounded-lg bg-rose-50 text-rose-700 font-bold border border-rose-200 text-[11px] active:scale-95 shadow-2xs shrink-0 flex items-center space-x-0.5" title="選択した食材を削除">
+              <button type="button" id="btn-bulk-delete" class="px-2 py-1 rounded-lg bg-rose-50 text-rose-700 font-bold border border-rose-200 text-[11px] active:scale-95 shadow-2xs shrink-0 flex items-center space-x-0.5" title="選択した食材を削除">
                 <span>🗑️</span>
-                <span class="hidden sm:inline">削除</span>
+                <span>削除</span>
               </button>
             </div>
           ` : `
